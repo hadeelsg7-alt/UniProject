@@ -55,6 +55,7 @@ Return only the requested structured output."""
                                         sentiment_vs_severity_note=note, reasoning_summary=note,
                                         verification_status=VerificationStatus.NOT_APPLICABLE, reasoner="rules")
             state.messages.append(AgentMessage(sender=self.name, receiver="Agent3", message_type="HANDOFF", content=note))
+            state.agent2_history.append(state.agent2.model_copy(deep=True))
             return []
 
         impacts, reasoner = self._impacts(state)
@@ -123,6 +124,7 @@ Return only the requested structured output."""
             state.log(self.name, "REQUEST_REASSESSMENT",
                       f"Round {state.revision_count + 1}: sending {len(msgs)} concern(s) to Agent1: " + ", ".join(m.concern_code for m in msgs))
             state.agent2 = self._output(state, assessments, senti, reasoner, provisional=True)
+            state.agent2_history.append(state.agent2.model_copy(deep=True))
             return msgs
 
         if pending:
@@ -132,6 +134,7 @@ Return only the requested structured output."""
         out = self._output(state, assessments, senti, reasoner, provisional=False)
         state.agent2 = out
         state.log(self.name, "DECISION", out.reasoning_summary)
+        state.agent2_history.append(out.model_copy(deep=True))
         state.messages.append(AgentMessage(sender=self.name, receiver="Agent3", message_type="HANDOFF",
                                            content=f"Overall severity {out.overall_severity.value if out.overall_severity else '-'}, "
                                                    f"priority {out.overall_priority.value if out.overall_priority else '-'}, verification {out.verification_status.value}",

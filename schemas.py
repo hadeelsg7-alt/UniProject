@@ -320,11 +320,14 @@ class WorkflowState(BaseModel):
     agent1: Optional[Agent1Output] = None
     agent1_history: list[Agent1Output] = Field(default_factory=list)
     agent2: Optional[Agent2Output] = None
+    agent2_history: list[Agent2Output] = Field(default_factory=list)  # one entry per Agent 2 pass
     agent3: Optional[Agent3Output] = None
     messages: list[AgentMessage] = Field(default_factory=list)
     decision_log: list[LogEntry] = Field(default_factory=list)
     tool_calls: list[ToolCall] = Field(default_factory=list)
     node_trace: list[str] = Field(default_factory=list)
+    # decision_log length when each node in node_trace started (lets the UI replay each step)
+    node_log_index: list[int] = Field(default_factory=list)
     revision_count: int = 0
     max_revisions: int = 2
     resolved_concerns: dict[str, str] = Field(default_factory=dict)

@@ -16,7 +16,7 @@ transition is visible in ``state.node_trace`` and the decision log.
 from __future__ import annotations
 
 from datetime import date
-from typing import Iterable, Optional
+from typing import Callable, Iterable, Optional
 
 import config
 from agents import FeedbackInvestigationAgent, ImpactAssessmentAgent, ResolutionEscalationAgent
@@ -38,7 +38,10 @@ class MultiAgentWorkflow:
         self.agent2 = ImpactAssessmentAgent(self.llm)
         self.agent3 = ResolutionEscalationAgent(self.llm)
 
-    def run(self, review: ReviewInput, reference_date: Optional[date] = None) -> WorkflowState:
+    def run(self, review: ReviewInput, reference_date: Optional[date] = None,
+            on_step: Optional[Callable[[str, WorkflowState], None]] = None) -> WorkflowState:
+        """Run the workflow. `on_step(node, state)` is called when each node starts
+        (used by the UI to show which agent is really working); it never changes the flow."""
         state = WorkflowState(review=review, max_revisions=self.max_revisions, reasoner=self.llm.name)
         if self.llm.note:
             state.log("Orchestrator", "CONFIG", self.llm.note)
@@ -46,6 +49,9 @@ class MultiAgentWorkflow:
         node, pending = A1_ANALYZE, []
         for _ in range(config.MAX_WORKFLOW_STEPS):
             state.node_trace.append(node)
+            state.node_log_index.append(len(state.decision_log))
+            if on_step:
+                on_step(node, state)
             if node == A1_ANALYZE:
                 self.agent1.analyze(state)
                 node = A2_ASSESS
@@ -67,6 +73,9 @@ class MultiAgentWorkflow:
                 node = END
             if node == END:
                 state.node_trace.append(END)
+                state.node_log_index.append(len(state.decision_log))
+                if on_step:
+                    on_step(END, state)
                 break
         else:  # pragma: no cover - safety guard
             state.errors.append("Workflow step limit reached")

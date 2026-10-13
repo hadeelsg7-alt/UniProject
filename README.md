@@ -63,7 +63,7 @@ A browser opens at <http://localhost:8501>.
 ### 1.5 Run the tests and the scenarios
 
 ```bash
-pytest -q                                   # 57 functional, scenario and regression tests (offline, no API key)
+pytest -q                                   # 62 functional, scenario, regression and UI tests (offline, no API key)
 python run_scenarios.py --provider offline  # all scenarios, rule-based reasoner
 python run_scenarios.py                     # all scenarios with the LLM from .env
 python run_scenarios.py --only S1 S6        # selected scenarios
@@ -76,8 +76,8 @@ python run_scenarios.py --only S1 S6        # selected scenarios
 
 ## 2. How to test the scenarios
 
-In the dashboard, open the **🧪 Test scenarios** tab, choose a scenario and click **Run scenario**. The **📊 Evaluation**
-tab runs all of them at once and shows the behavioural checks.
+In the dashboard, open the **Test scenarios** page, choose a scenario (S1–S8) and click **Run scenario**. The
+**Evaluation** page runs all of them at once and shows the behavioural checks.
 
 | Key | Scenario | Source | What it demonstrates |
 |---|---|---|---|
@@ -93,7 +93,7 @@ tab runs all of them at once and shows the behavioural checks.
 
 Each scenario shows: the original Arabic review, Agent 1/2/3 outputs, the tools used, the inter-agent revision history,
 the decision log and the final operational decision. When `data/reviews.csv` is present, every real scenario is checked
-to exist verbatim in the dataset (✅ in the Scenarios tab).
+to exist verbatim in the dataset (✅ on the Test scenarios page).
 
 ---
 
@@ -126,7 +126,13 @@ to exist verbatim in the dataset (✅ in the Scenarios tab).
 
 | File | Purpose |
 |---|---|
-| `app.py` | Streamlit dashboard: upload, review selection, run button, 3 agent panels, workflow graph, decision log, ticket, JSON/CSV download, batch analysis, evaluation |
+| `app.py` | Streamlit entry point: page config, sidebar (reasoning mode, settings, dataset upload) and navigation |
+| `ui/theme.py` | Design tokens (navy / white / teal), validated chart palettes, global CSS incl. RTL Arabic |
+| `ui/components.py` | Reusable components: KPI cards, severity/priority badges, workflow diagram, evidence highlighting, issue and assessment cards, message timeline, escalation checklist, ticket |
+| `ui/charts.py` | Altair charts (categories, EGSQUAL dimensions, priority, severity, severity-by-rating, checks, P/R/F1) |
+| `ui/result_view.py` | The multi-agent result screen: live run, step-by-step replay, three agent panels, communication, audit trail, export |
+| `ui/pages.py` | Pages: Dashboard, Analyse feedback, Test scenarios, Batch analysis, Evaluation, Methodology & rules |
+| `.streamlit/config.toml` | Light navy/teal theme for presentations |
 | `agents/agent1.py` | Feedback Investigation Agent |
 | `agents/agent2.py` | Impact Assessment & Prioritization Agent |
 | `agents/agent3.py` | Resolution & Escalation Agent |
@@ -207,7 +213,7 @@ You can change all thresholds in `knowledge_base/*.json` without touching the co
 
 ## 5. Evaluation
 
-- **Behavioural checks** (`evaluation.py`, Evaluation tab, `run_scenarios.py`) test:
+- **Behavioural checks** (`evaluation.py`, Evaluation page, `run_scenarios.py`) test:
   - that evidence is found in the review;
   - that multiple issues are detected;
   - that ambiguity is flagged;
@@ -220,7 +226,7 @@ You can change all thresholds in `knowledge_base/*.json` without touching the co
   These are **rule-compliance checks, not accuracy scores**.
 - **Precision / Recall / F1** are computed **only** when you upload a CSV of **verified reference labels**
   (`review_id` plus any of `feedback_type`, `severity`, `priority`, `action`, `escalation_status`, `dimensions`) in
-  the Evaluation tab. The dataset has no such labels, so no accuracy figures are claimed.
+  the Evaluation page. The dataset has no such labels, so no accuracy figures are claimed.
 
 ---
 
@@ -250,7 +256,7 @@ You can change all thresholds in `knowledge_base/*.json` without touching the co
 All of the following were run in this development environment, and only these results are claimed.
 
 - ✅ **Clean install:** a fresh Python 3.11 virtual environment installed from `requirements.txt`.
-- ✅ **57 automated tests pass** (`pytest -q`): unit, agent, workflow, revision loop (including a forced
+- ✅ **62 automated tests pass** (`pytest -q`), including 5 UI tests, unit, agent, workflow, revision loop (including a forced
   **2-round** loop that stops at the cap), 9 scenarios, data loader, 10 realistic-review regression cases, and the
   LLM code path (stub LLM plus the real Anthropic SDK structured-output call against a local mock server).
 - ✅ **Whole dataset, three-agent integration:** all 6,354 unique reviews were run end to end, and cross-agent rules
@@ -273,9 +279,30 @@ All of the following were run in this development environment, and only these re
   LLM-mode results. Each review makes about 2–4 API calls.
 
 ### How to tell which mode is running
-The dashboard shows a banner under the title:
-- **"Reasoning mode: LLM – anthropic:claude-opus-5-5"** when a key is configured, or
-- **"Reasoning mode: OFFLINE RULE-BASED HEURISTICS – no LLM is being called"** when it is not.
+- **Sidebar and page banner:** a green **"LLM mode · anthropic:claude-opus-5-5"** when a key is configured, or a
+  yellow **"Offline rule-based mode · no LLM is being called"** when it is not.
+- **Each agent card and panel** says what actually produced its output: `LLM`, `Rule-based (offline)`,
+  `Fallback (LLM failed)` or `LLM + fallback`.
+- **If any LLM call fails during a run,** a red **"LLM failure · N step(s) used the rule-based fallback"** banner
+  lists each failed step and its error. A fallback is never presented as an LLM result. This was tested by pointing
+  the app at an unreachable API endpoint; the API key never appears in the page.
 
 The CLI prints `Reasoner: ...` on its first line. Every result stores it in `state.reasoner`, and an LLM failure
 on any step is logged as `LLM_FALLBACK`.
+
+## 9. Dashboard guide (for the presentation)
+
+Launch with `streamlit run app.py` and open <http://localhost:8501>.
+
+| Page | What to show |
+|---|---|
+| **Dashboard** | Dataset KPIs, then **Run sample analysis** to get KPIs and interactive charts. The KPIs are reviews analysed, issues extracted, High/Critical, P1/P2, simulated tickets and revision loops. The charts are feedback categories, EGSQUAL dimensions, priority, severity, and *severity vs star rating*. Everything is computed only from reviews actually analysed in the session. |
+| **Analyse feedback** | Type a review (or load a researcher-written example), pick one from the dataset, or upload a CSV. The pipeline shows the active agent live. The result shows the decision summary, a workflow diagram with a revision counter, **step-by-step replay** of the real trace, and tabs for each agent, communication, audit trail and export. |
+| **Test scenarios** | S1–S8 cards. **S6** shows a real Agent 2 → Agent 1 revision; **S8** (synthetic) shows an escalation candidate awaiting human approval. |
+| **Batch analysis** | Filters, KPIs, charts, a results table, CSV/JSON export and drill-down into any result. |
+| **Evaluation** | Behavioural checks (pass/fail chart). Precision, Recall and Macro F1 appear only after uploading **verified** reference labels; a label template is provided. |
+| **Methodology & rules** | EGSQUAL definitions, the R1–R4 / P-rules and the E1–E5 escalation rules. |
+
+The step replay and live view are driven by the workflow's own callbacks and trace (`node_log_index`,
+`agent1_history`, `agent2_history`), so each step shows only what existed at that point. Revision arrows and
+counters appear only when a review request really occurred.

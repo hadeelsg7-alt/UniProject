@@ -1,0 +1,11 @@
+[theme]
+# Light, high-contrast theme for projector demos (navy / white / teal)
+base = "light"
+primaryColor = "#0E8C87"
+backgroundColor = "#F4F7FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0B1F3A"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false

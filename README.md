@@ -63,7 +63,7 @@ A browser opens at <http://localhost:8501>.
 ### 1.5 Run the tests and the scenarios
 
 ```bash
-pytest -q                                   # 46 functional + scenario tests (offline, no API key)
+pytest -q                                   # 57 functional, scenario and regression tests (offline, no API key)
 python run_scenarios.py --provider offline  # all scenarios, rule-based reasoner
 python run_scenarios.py                     # all scenarios with the LLM from .env
 python run_scenarios.py --only S1 S6        # selected scenarios
@@ -247,11 +247,35 @@ You can change all thresholds in `knowledge_base/*.json` without touching the co
 
 ## 8. What was tested and what was not
 
-- ✅ All 46 tests pass offline (unit, agent, workflow, revision loop, 9 scenarios, data loader, LLM path via a stub,
-  and the **real Anthropic SDK structured-output call against a local mock server**).
-- ✅ The dashboard was run with Streamlit's `AppTest` (every tab and button, no exceptions) and checked in a real
-  headless browser.
-- ✅ The offline pipeline was run on 1,500 random real reviews with no runtime errors.
-- ⚠️ **Not tested:** live calls to the Anthropic or OpenAI APIs. No API key was available during development. The
-  OpenAI path (`responses.parse`) was checked only against the installed SDK's method signature. Run
-  `python run_scenarios.py` with your key to validate LLM-mode outputs.
+All of the following were run in this development environment, and only these results are claimed.
+
+- ✅ **Clean install:** a fresh Python 3.11 virtual environment installed from `requirements.txt`.
+- ✅ **57 automated tests pass** (`pytest -q`): unit, agent, workflow, revision loop (including a forced
+  **2-round** loop that stops at the cap), 9 scenarios, data loader, 10 realistic-review regression cases, and the
+  LLM code path (stub LLM plus the real Anthropic SDK structured-output call against a local mock server).
+- ✅ **Whole dataset, three-agent integration:** all 6,354 unique reviews were run end to end, and cross-agent rules
+  were checked on every run. Agent 2 assesses exactly Agent 1's final issues; every review request is answered; the
+  loop never exceeds 2 rounds; ticket severity equals Agent 2's overall severity; no complaint reference is invented;
+  every ticket is marked simulated with human approval. **0 violations, 0 runtime errors** (about 2 minutes, offline).
+- ✅ **User interface:** launched with `streamlit run app.py` and driven in a headless Chromium browser. Single
+  review (typed and from the dataset), scenario S8, batch analysis and evaluation all ran with no exceptions.
+- ⚠️ **Offline reasoner quality** (developer's judgement on blind random samples of 20 real reviews; no ground truth):
+  13/20 acceptable before fixes, and 16/20 fully plus 2/20 partly acceptable on a new sample after fixes. Known
+  weak spots:
+  - rhetorical questions ("ليش ...؟") can be typed as Inquiries;
+  - some topic confusions (a privacy complaint about location access was read as a report failure);
+  - the dialect verb "ما يسوي" (doesn't work) is ambiguous with "ما يسوى" (worthless) and is not used.
+
+  This mode is a transparent baseline, not the intended research configuration.
+- ❌ **Not tested: live LLM calls.** No Anthropic or OpenAI API key was available, so no real Claude/OpenAI output
+  has been produced or evaluated. The OpenAI path (`responses.parse`) was only checked against the SDK's method
+  signature. With a key, run `python run_scenarios.py` and review `outputs/scenario_report.md` before relying on
+  LLM-mode results. Each review makes about 2–4 API calls.
+
+### How to tell which mode is running
+The dashboard shows a banner under the title:
+- **"Reasoning mode: LLM – anthropic:claude-opus-5-5"** when a key is configured, or
+- **"Reasoning mode: OFFLINE RULE-BASED HEURISTICS – no LLM is being called"** when it is not.
+
+The CLI prints `Reasoner: ...` on its first line. Every result stores it in `state.reasoner`, and an LLM failure
+on any step is logged as `LLM_FALLBACK`.

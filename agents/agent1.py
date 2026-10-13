@@ -100,7 +100,7 @@ Return only the requested structured output."""
         if len(issues) <= 1 or word_count(r.text) <= 6 or raw.is_ambiguous:
             amb = self.call_tool(state, "ambiguity_checker", "Few issues / short text: check for ambiguous or incomplete feedback",
                                  review_text=r.text,
-                                 issues=[{"topic": i.topic, "affected_service": i.affected_service} for i in issues],
+                                 issues=[{"topic": i.topic, "affected_service": i.affected_service, "issue_type": i.issue_type} for i in issues],
                                  feedback_type=raw.feedback_type)
             if amb["is_ambiguous"] != is_amb:
                 state.log(self.name, "SELF_REVISION", f"Ambiguity flag set to {amb['is_ambiguous']} by ambiguity checker")
@@ -234,7 +234,7 @@ Return only the requested structured output."""
                     expl = f"{iss.issue_id}: the review contains no stronger evidence; original quote kept."
             elif code == "AMBIGUITY_CHECK":
                 amb = self.call_tool(state, "ambiguity_checker", "Re-check whether the review states what failed",
-                                     review_text=r.text, issues=[{"topic": i.topic, "affected_service": i.affected_service} for i in new.issues],
+                                     review_text=r.text, issues=[{"topic": i.topic, "affected_service": i.affected_service, "issue_type": i.issue_type} for i in new.issues],
                                      feedback_type=new.feedback_type)
                 if amb["is_ambiguous"]:
                     new.missing_information = sorted(set(new.missing_information + amb["missing_information"]))

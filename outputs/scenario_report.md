@@ -45,7 +45,7 @@ Reasoner: `offline-rule-based`. Escalation and complaint rules are PROPOSED rese
   - E4 MET: Severity High vs minimum High
   - E5 UNKNOWN: Awaiting human officer approval (mandatory)
 
-**Simulated ticket SIM-20261013-C91C35** (Internal technical ticket)
+**Simulated ticket SIM-20261013-71B5FE** (Internal technical ticket)
 
 - Title: [Citizen Acc] Login / authentication: failure reported (step does not work as expected)
 - Application: Citizen Account (Citizen Acc)
@@ -118,7 +118,7 @@ Reasoner: `offline-rule-based`. Escalation and complaint rules are PROPOSED rese
   - E4 NOT_MET: Severity Medium vs minimum High
   - E5 UNKNOWN: Awaiting human officer approval (mandatory)
 
-**Simulated ticket SIM-20261013-94DC3E** (Internal technical ticket)
+**Simulated ticket SIM-20261013-401747** (Internal technical ticket)
 
 - Title: [SPL] App closes unexpectedly / crashes
 - Application: SPL Online (SPL)
@@ -185,7 +185,7 @@ Reasoner: `offline-rule-based`. Escalation and complaint rules are PROPOSED rese
   - E4 MET: Severity High vs minimum High
   - E5 UNKNOWN: Awaiting human officer approval (mandatory)
 
-**Simulated ticket SIM-20261013-6A685E** (Information request to beneficiary)
+**Simulated ticket SIM-20261013-436240** (Information request to beneficiary)
 
 - Title: [Baladia Report] App or service reported as not working (feature not specified)
 - Application: My Reports (940 Reports) (Baladia Report)
@@ -244,7 +244,7 @@ Reasoner: `offline-rule-based`. Escalation and complaint rules are PROPOSED rese
 - Secondary actions: -
 - Escalation status: **NOT_APPLICABLE** | missing fields: -
 
-**Simulated ticket SIM-20261013-9F5F01** (Information request to beneficiary)
+**Simulated ticket SIM-20261013-BF8155** (Information request to beneficiary)
 
 - Title: Clarification needed: unspecific beneficiary feedback
 - Application: AL KAHRABA (KAHRABA)
@@ -311,7 +311,7 @@ Reasoner: `offline-rule-based`. Escalation and complaint rules are PROPOSED rese
   - E4 NOT_MET: Severity Low vs minimum High
   - E5 UNKNOWN: Awaiting human officer approval (mandatory)
 
-**Simulated ticket SIM-20261013-4FD9E6** (Service improvement request)
+**Simulated ticket SIM-20261013-0E28C7** (Service improvement request)
 
 - Title: [GOSI] Improvement suggestion - login / authentication
 - Application: General Organization for Social Insurance (GOSI)
@@ -385,7 +385,7 @@ Reasoner: `offline-rule-based`. Escalation and complaint rules are PROPOSED rese
   - E4 MET: Severity Critical vs minimum High
   - E5 UNKNOWN: Awaiting human officer approval (mandatory)
 
-**Simulated ticket SIM-20261013-304D85** (Internal technical ticket)
+**Simulated ticket SIM-20261013-76CA3D** (Internal technical ticket)
 
 - Title: [SCE] Payment / fees: failure reported (step does not work as expected)
 - Application: Saudi Council of Engineers (SCE)
@@ -452,7 +452,7 @@ Reasoner: `offline-rule-based`. Escalation and complaint rules are PROPOSED rese
   - E4 NOT_MET: Severity Medium vs minimum High
   - E5 UNKNOWN: Awaiting human officer approval (mandatory)
 
-**Simulated ticket SIM-20261013-B05067** (Internal technical ticket)
+**Simulated ticket SIM-20261013-77EF36** (Internal technical ticket)
 
 - Title: [Watani] Language / localisation: failure reported (step does not work as expected)
 - Application: Watani - We hear you (Watani)
@@ -530,7 +530,7 @@ Reasoner: `offline-rule-based`. Escalation and complaint rules are PROPOSED rese
   - E4 MET: Severity High vs minimum High
   - E5 UNKNOWN: Awaiting human officer approval (mandatory)
 
-**Simulated ticket SIM-20261013-2F838F** (Complaint follow-up)
+**Simulated ticket SIM-20261013-2C42F9** (Complaint follow-up)
 
 - Title: [NWC] Login / authentication: failure reported (step does not work as expected)
 - Application: National Water Company (NWC)
@@ -600,7 +600,7 @@ Reasoner: `offline-rule-based`. Escalation and complaint rules are PROPOSED rese
   - E4 MET: Severity Critical vs minimum High
   - E5 UNKNOWN: Awaiting human officer approval (mandatory)
 
-**Simulated ticket SIM-20261013-75D429** (Escalation candidate (SIMULATED - awaiting human approval))
+**Simulated ticket SIM-20261013-B9DBC9** (Escalation candidate (SIMULATED - awaiting human approval))
 
 - Title: [SYNTHETIC-APP] Payment / fees: failure reported (step does not work as expected)
 - Application: Synthetic demo app (SYNTHETIC-APP)

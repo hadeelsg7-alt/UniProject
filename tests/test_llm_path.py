@@ -115,3 +115,27 @@ def test_anthropic_sdk_structured_output_roundtrip(mock_server, monkeypatch):
     assert sent["model"] == config.ANTHROPIC_MODEL
     assert sent["output_config"]["format"]["type"] == "json_schema"
     assert "feedback_type" in json.dumps(sent["output_config"]["format"]["schema"])
+
+
+def test_revision_loop_reaches_two_rounds_then_stops():
+    """Agent1 'revises' but the type conflict persists: Agent2 must ask twice, then stop at the cap."""
+    impact = LLMImpactAssessment(assessments=[LLMImpact(issue_id="I1", service_completion="BLOCKED", scope="INDIVIDUAL",
+                                                       workaround_mentioned=False, risk_flags=["FINANCIAL"],
+                                                       impact_summary="Cannot pay", supporting_quote="الدفع لا يعمل", reasoning="stub")])
+    still_praise = LLMRevisionResponse(decision="REVISE", explanation="minor wording change",
+                                       revised_analysis=_analysis("Praise", "الدفع لا يعمل ويطلع خطأ"))
+    stub = StubLLM({
+        "LLMAgent1Analysis": [_analysis("Praise", "الدفع لا يعمل ويطلع خطأ")],
+        "LLMImpactAssessment": [impact],
+        "LLMRevisionResponse": [still_praise, still_praise.model_copy(deep=True)],
+        "LLMTicketText": [LLMTicketText(title="Payment fails", affected_service="Payment", issue_description="x")],
+    })
+    st = MultiAgentWorkflow(stub, max_revisions=2).run(REVIEW)
+    assert st.revision_count == 2
+    assert [m.round for m in st.messages if m.message_type == "REVIEW_REQUEST"] == [1, 2]
+    assert st.node_trace == ["A1_ANALYZE", "A2_ASSESS", "A1_REVIEW_RESPONSE", "A2_ASSESS",
+                             "A1_REVIEW_RESPONSE", "A2_ASSESS", "A3_RESOLVE", "END"]
+    assert any(e.action == "LIMIT_REACHED" for e in st.decision_log)
+    a = st.agent2.assessments[0]
+    assert a.verification_status.value == "INSUFFICIENT_EVIDENCE" and a.priority.value == "P3"
+    assert st.agent3 is not None

@@ -160,7 +160,8 @@ def ambiguity_checker(review_text: str, issues: list[dict], feedback_type: str) 
         missing.append("What exactly went wrong (feature, step, error message)")
     if n_words <= 3 and not has_topic and not praise_only:
         reasons.append(f"A2: review is very short ({n_words} words) and names no feature or service")
-    if issues and all(i.get("topic") == "GENERAL_MALFUNCTION" or i.get("affected_service") == "unspecified" for i in issues):
+    problems = [i for i in issues if i.get("issue_type") not in ("Suggestion", "Inquiry", "Praise")]
+    if problems and all(i.get("topic") in ("GENERAL_MALFUNCTION", "x", None) and i.get("affected_service") == "unspecified" for i in problems):
         reasons.append("A3: the review reports a failure but does not state which feature/service failed")
         missing.append("Which feature or service the beneficiary was using")
     if find_cues(review_text, lx.VAGUE) and not has_topic:

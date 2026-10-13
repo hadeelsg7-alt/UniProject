@@ -41,7 +41,7 @@ st.markdown("""
 st.sidebar.title("⚙️ Configuration")
 providers = ["anthropic", "openai", "offline"]
 default_provider = config.LLM_PROVIDER if config.LLM_PROVIDER in providers else "offline"
-provider = st.sidebar.selectbox("Reasoning engine (LLM provider)", providers, index=providers.index(default_provider),
+provider = st.sidebar.selectbox("Requested reasoning engine", providers, index=providers.index(default_provider),
                                 help="'offline' = transparent rule-based reasoner (no API key needed).")
 llm = LLMClient(provider=provider)
 if llm.available:
@@ -273,6 +273,13 @@ def review_filters(prefix: str) -> pd.DataFrame | None:
 st.title("🏛️ Multi-Agent AI Framework for Arabic Beneficiary Feedback Analysis")
 st.caption("Research prototype · Saudi government digital services · Agents: Investigation → Impact Assessment ⇄ (revision loop) → "
            "Resolution & Escalation · All tickets and escalations are **simulated**; nothing is sent to AMER, DGA or any government system.")
+
+if llm.available:
+    st.success(f"🧠 Reasoning mode: **LLM** - `{llm.name}` (language understanding by the LLM; severity, priority and "
+               "escalation decided by the documented rule engines).")
+else:
+    st.warning("⚙️ Reasoning mode: **OFFLINE RULE-BASED HEURISTICS** - no LLM is being called. "
+               f"{llm.note} Add an API key to `.env` and restart to use the LLM.")
 
 tab_single, tab_scen, tab_batch, tab_eval, tab_rules = st.tabs(
     ["🔎 Single review", "🧪 Test scenarios", "📦 Batch analysis", "📊 Evaluation", "📘 Rules & knowledge base"])

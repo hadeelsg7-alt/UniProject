@@ -74,7 +74,7 @@ Return only the requested structured output."""
             if imp.service_completion in ("BLOCKED", "PARTIALLY_BLOCKED"):
                 cues = self.call_tool(state, "impact_cue_detector", f"{iss.issue_id} judged {imp.service_completion}: confirm a failure cue exists in the evidence",
                                       span=iss.evidence + " " + (imp.supporting_quote if qv["verified"] else ""))
-                if not (cues["hard_failure"] or cues["crash"] or cues["soft_problem"]):
+                if not (cues["hard_failure"] or cues["crash"] or cues["soft_problem"] or cues["missing"]):
                     concerns.append(("WEAK_EVIDENCE", [iss.issue_id],
                                      f"Impact judged {imp.service_completion} but the quoted evidence contains no explicit failure statement. "
                                      "Please re-examine the original text for the span that states the failure."))

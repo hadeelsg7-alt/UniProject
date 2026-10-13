@@ -58,6 +58,17 @@ def _praise_hits(text: str, nc) -> int:
     return count
 
 
+def _suggestion_hits(text: str, nc) -> int:
+    norm = nc[0]
+    count = 0
+    for m in find_cues(text, lx.SUGGESTION, nc):
+        before = norm[: m.norm_start].split()
+        if before and before[-1] == "علي":  # "مشكورين على تسهيل" = thanks for making it easy
+            continue
+        count += 1
+    return count
+
+
 def features(text: str) -> dict:
     nc = normalize_with_map(text)
     return {
@@ -66,11 +77,14 @@ def features(text: str) -> dict:
         "soft": bool(find_cues(text, lx.SOFT_PROBLEM, nc)),
         "error": bool(find_cues(text, lx.ERROR_CUES, nc)),
         "missing": bool(find_cues(text, lx.MISSING, nc)),
-        "sugg": bool(find_cues(text, lx.SUGGESTION, nc)),
+        "sugg": _suggestion_hits(text, nc) > 0,
         "inquiry": bool(find_cues(text, [c for c in lx.INQUIRY if c not in ("؟", "?")], nc, whole_word=True)),
         "praise": _praise_hits(text, nc),
         "negative": len(find_cues(text, lx.NEGATIVE, nc)),
         "crash": bool(find_cues(text, lx.CRASH_CUES, nc)),
+        "service": bool(find_cues(text, lx.SERVICE_TERMS, nc)),
+        "contrast": bool(find_cues(text, [normalize(w) for w in ("بس", "لكن", "ولكن")], nc, whole_word=True)),
+        "done": bool(find_cues(text, [normalize(w) for w in ("تم الحجز", "تم الطلب", "تم السداد", "تم التسجيل", "طلع لي تم")], nc)),
         "words": len(tokens(text)),
     }
 
@@ -160,6 +174,18 @@ def merge_pieces(text: str, pieces: list[Piece]) -> list[Piece]:
             out[-1] = _merge(text, out[-1], p)
         else:
             out.append(p)
+    # Pass A2: a short suggestion-marker fragment -> merge with the following piece of the same clause
+    merged: list[Piece] = []
+    i = 0
+    while i < len(out):
+        p = out[i]
+        if (p.feats["sugg"] and p.feats["words"] < 3 and not p.feats["topics"]
+                and i + 1 < len(out) and out[i + 1].clause == p.clause):
+            out[i + 1] = _merge(text, p, out[i + 1])
+        else:
+            merged.append(p)
+        i += 1
+    out = merged
     # Pass B: topic-only piece (no problem / suggestion / inquiry) -> merge into following piece of same clause with a problem
     res: list[Piece] = []
     i = 0
@@ -198,15 +224,18 @@ def _primary_topic(topics: list[str]) -> str | None:
 def _issue_type(f: dict, topic: str, question: bool, rhetorical_context: bool) -> str:
     t = lx.TOPICS.get(topic)
     technical = bool(t and (t.gateway or t.problem_dimension in _TECH_DIMS))
-    if f["sugg"] and not f["hard"]:
+    if f["sugg"] and not f["hard"] and not f["error"]:
         return "Suggestion"
     # a question word inside a negative/contrastive complaint is usually rhetorical
     is_question = question or (f["inquiry"] and not rhetorical_context)
-    if is_question and not f["hard"] and not f["soft"]:
+    if is_question and not f["hard"] and not f["soft"] and not f["missing"]:
         return "Inquiry"
+    if f["missing"] and f.get("service") and (f.get("contrast") or f.get("done")):
+        return "Bug"
     if f["hard"] and (technical or topic == "GENERAL_MALFUNCTION" or topic in ("REPORTING", "LANGUAGE", "DATA_ACCURACY")):
         return "Bug"
-    if topic in ("STABILITY", "PERFORMANCE") or f["error"] or (f["soft"] and technical):
+    inherent_tech = {"STABILITY", "PERFORMANCE"} & set(f["topics"])
+    if topic in ("STABILITY", "PERFORMANCE") or inherent_tech or f["crash"] or f["error"] or (f["soft"] and technical):
         return "Bug"
     return "General Complaint"
 
@@ -232,21 +261,35 @@ def _description(itype: str, topic: str, f: dict) -> str:
     if itype == "Suggestion":
         return f"Improvement suggestion - {label.lower()}" if topic != "GENERAL_MALFUNCTION" else "Feature / service-option request"
     if itype == "Inquiry":
-        return f"Beneficiary question about {label.lower()}"
+        return "Beneficiary question about a service / feature" if topic == "GENERAL_MALFUNCTION" else f"Beneficiary question about {label.lower()}"
     if topic == "STABILITY":
         return "App closes unexpectedly / crashes" if f["crash"] else "App freezes / hangs"
     if topic == "PERFORMANCE":
         return "App is slow / takes too long"
     if topic == "SUPPORT_RESPONSE":
         return "Complaint handling: no response / no action from the service provider"
+    if itype == "Bug" and f["missing"] and f.get("service") and not f["hard"]:
+        return f"{label if topic != 'GENERAL_MALFUNCTION' else 'Service transaction'}: reported as done but not fulfilled"
+    if topic == "GENERAL_MALFUNCTION" and f["missing"] and not f["hard"]:
+        return "Expected feature / option is missing"
+    if topic == "GENERAL_MALFUNCTION" and f["error"] and f.get("service"):
+        return "Service transaction fails with an error"
+    if topic == "GENERAL_MALFUNCTION" and f["error"] and not f["hard"]:
+        return "Errors / technical faults reported (feature not specified)"
     if topic == "GENERAL_MALFUNCTION":
         return "App or service reported as not working (feature not specified)"
     if itype == "Bug":
+        if f["crash"]:
+            return f"{label}: app crashes / exits during this step"
+        if "STABILITY" in f["topics"]:
+            return f"{label}: app freezes during this step"
+        if "PERFORMANCE" in f["topics"]:
+            return f"{label}: slow during this step"
         if f["hard"]:
             return f"{label}: failure reported (step does not work as expected)"
         return f"{label}: malfunction / error reported"
     if f["missing"]:
-        return f"{label}: expected feature or channel is missing"
+        return "Expected feature / option is missing" if topic == "GENERAL_MALFUNCTION" else f"{label}: expected feature or channel is missing"
     return f"Dissatisfaction with {label.lower()}"
 
 
@@ -268,33 +311,51 @@ def offline_agent1_analysis(review: ReviewInput) -> LLMAgent1Analysis:
     pieces = merge_pieces(text, segment(text))
     neg_context = (review.rating is not None and review.rating <= 2)
     issues: list[LLMIssue] = []
+    issue_start: list[int] = []  # start offset of each issue's evidence span
+    last_issue_piece = -2
     praise_total = 0
-    for p in pieces:
+    for idx, p in enumerate(pieces):
         f = p.feats
         praise_total += f["praise"]
         topic = _primary_topic(f["topics"])
         problem = _has_problem(f) or p.contrast_inside
+        skip = False
         if topic is None:
-            if f["hard"]:
+            if f["hard"] or f["error"]:
                 topic = "GENERAL_MALFUNCTION"
-            elif f["sugg"] and f["words"] >= 3 and not f["praise"]:
+            elif (f["sugg"] or f["missing"]) and f["words"] >= 3 and not f["praise"]:
                 topic = "GENERAL_MALFUNCTION"
+            elif (p.question or f["inquiry"]) and f["words"] >= 3 and not f["praise"] and not f["negative"] and not neg_context:
+                topic = "GENERAL_MALFUNCTION"  # plain question about an unnamed feature/service
             else:
-                continue
+                skip = True
         else:
             if not (problem or f["sugg"] or f["inquiry"] or p.question):
                 if not (f["negative"] or (neg_context and p.contrast_before)):
-                    continue
+                    skip = True
             if f["praise"] and not problem and not f["sugg"]:
-                continue
+                skip = True
+        if skip:
+            # A clause right after an issue that only adds context ("tried many times, same problem",
+            # "and the fees were deducted") is attached to that issue's evidence instead of being lost.
+            nc_p = normalize_with_map(text[p.start:p.end])
+            adds_context = (find_cues(text[p.start:p.end], lx.CONTINUATION + lx.RECURRING, nc_p)
+                            or "PAYMENT" in f["topics"] or "PRIVACY" in f["topics"])
+            if issues and last_issue_piece == idx - 1 and adds_context and not f["praise"]:
+                ev = text[issue_start[-1]:p.end].strip(" ،,.!؟?\n-")
+                issues[-1] = issues[-1].model_copy(update={"evidence_quote": ev})
+                last_issue_piece = idx
+            continue
         itype = _issue_type(f, topic, p.question, rhetorical_context=neg_context or p.contrast_inside or bool(f["negative"]))
         tdef = lx.TOPICS.get(topic, lx.GENERIC_TOPIC)
         dim = tdef.suggestion_dimension if itype == "Suggestion" else ("INFORMATION_QUALITY" if itype == "Inquiry" else tdef.problem_dimension)
-        if topic == "GENERAL_MALFUNCTION" and itype == "Suggestion":
+        if topic == "GENERAL_MALFUNCTION" and (itype == "Suggestion" or (f["missing"] and not f["hard"])):
             dim = "FULFILLMENT"
         evidence = text[p.start:p.end].strip(" ،,.!؟?\n-")
         affected = _affected_service(evidence, topic, tdef)
         conf = 0.8 if (f["topics"] and (problem or f["sugg"])) else (0.6 if f["topics"] else 0.5)
+        issue_start.append(p.start + (len(text[p.start:p.end]) - len(text[p.start:p.end].lstrip(" ،,.!؟?\n-"))))
+        last_issue_piece = idx
         issues.append(LLMIssue(
             description=_description(itype, topic, f), issue_type=itype, dimension=dim,
             evidence_quote=evidence, affected_service=affected,
@@ -319,7 +380,7 @@ def offline_agent1_analysis(review: ReviewInput) -> LLMAgent1Analysis:
     else:
         ftype, secondary = ("Praise" if (review.rating or 0) >= 4 else "General Complaint"), []
 
-    amb = tools.ambiguity_checker(text, [{"topic": "GENERAL_MALFUNCTION" if i.affected_service == "unspecified" else "x", "affected_service": i.affected_service} for i in issues], ftype)
+    amb = tools.ambiguity_checker(text, [{"topic": "GENERAL_MALFUNCTION" if i.affected_service == "unspecified" else "x", "affected_service": i.affected_service, "issue_type": i.issue_type} for i in issues], ftype)
     reasoning = (
         f"Rule-based reasoner: {len(pieces)} clause segment(s); {len(issues)} issue(s) extracted; "
         f"praise cues={praise_total}, negative cues={negative_total}, rating={review.rating}. "
@@ -357,6 +418,10 @@ def offline_impact(review: ReviewInput, issues: list) -> LLMImpactAssessment:
                 sc, why = "BLOCKED", f"hard failure cue {cues['hard_failure'][:2]}"
         elif cues["crash"]:
             sc, why = "PARTIALLY_BLOCKED", f"crash cue {cues['crash'][:2]}"
+        elif iss.issue_type == "Bug" and (find_cues(iss.evidence, lx.ERROR_CUES) or cues["missing"]) and tools.service_identifier(iss.evidence)["found"]:
+            repeated = cues["recurring"] or find_cues(iss.evidence, lx.CONTINUATION)
+            sc = "BLOCKED" if repeated else "PARTIALLY_BLOCKED"
+            why = f"error/unfulfilled result while performing a service{' - repeated attempts failed' if repeated else ''}"
         elif tdef and tdef.gateway and cues["soft_problem"]:
             sc, why = "PARTIALLY_BLOCKED", f"problem at a gateway step ({tdef.label_en}) {cues['soft_problem'][:2]}"
         elif cues["freeze_or_slow"] or cues["soft_problem"] or cues["missing"] or iss.issue_type == "General Complaint":

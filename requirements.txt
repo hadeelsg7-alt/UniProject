@@ -1,0 +1,9 @@
+# Python 3.11+
+streamlit>=1.40
+pandas>=2.2
+pydantic>=2.7
+python-dotenv>=1.0
+anthropic>=1.13      # Claude (default LLM provider): messages.parse structured outputs
+openai>=3.29         # optional alternative provider: responses.parse structured outputs
+tabulate>=0.9        # markdown tables in the scenario report
+pytest>=8.0

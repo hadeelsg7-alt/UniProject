@@ -1,0 +1,37 @@
+{
+  "_about": "PROPOSED severity and priority rules for this research prototype (Agent 2). They are the researcher's own operational rules, not an official standard. The rule logic lives in tools.severity_rule_engine(); the descriptions, the priority map and the caps below are read from this file.",
+  "principle": "Severity measures operational impact on the beneficiary's ability to complete the digital service. Negative sentiment and star rating are recorded but NEVER raise severity on their own (rule S0).",
+  "impact_factors": {
+    "service_completion": {
+      "BLOCKED": "The beneficiary cannot complete the service/task at all (e.g. cannot log in, payment not processed, app does not open).",
+      "PARTIALLY_BLOCKED": "The task fails sometimes, or can only be completed through a workaround (e.g. via the website).",
+      "DEGRADED": "The task can be completed but with friction (slowness, freezes, confusing UI, wrong language, missing convenience).",
+      "NOT_AFFECTED": "No effect on completing the service (suggestion, inquiry, praise, cosmetic remark)."
+    },
+    "scope": {
+      "INDIVIDUAL": "No signal that the problem repeats or affects others.",
+      "RECURRING": "The beneficiary reports the problem happens repeatedly (always, every time, more than once).",
+      "WIDESPREAD": "The text signals many users are affected (everyone, all users, many people)."
+    },
+    "risk_flags": {
+      "FINANCIAL": "Money paid/deducted, fees, invoices or refunds involved.",
+      "PERSONAL_DATA_SECURITY": "Personal data, privacy or security exposure.",
+      "SAFETY": "Emergency or physical-safety related report.",
+      "LEGAL_DEADLINE": "Fines, violations, legal or official deadlines at risk."
+    }
+  },
+  "severity_rules": [
+    {"id": "R1", "severity": "Critical", "rule": "service_completion = BLOCKED AND (risk flag in {FINANCIAL, PERSONAL_DATA_SECURITY, SAFETY} OR scope = WIDESPREAD)"},
+    {"id": "R2", "severity": "High", "rule": "service_completion = BLOCKED (no qualifying risk/scope), OR service_completion = PARTIALLY_BLOCKED with any risk flag"},
+    {"id": "R3", "severity": "Medium", "rule": "service_completion = PARTIALLY_BLOCKED, OR DEGRADED with scope in {RECURRING, WIDESPREAD} or any risk flag"},
+    {"id": "R4", "severity": "Low", "rule": "service_completion = DEGRADED (individual, no risk), OR NOT_AFFECTED"},
+    {"id": "S0", "severity": "-", "rule": "Sentiment intensity and star rating are reported for transparency but never change the severity level."}
+  ],
+  "priority_map": {"Critical": "P1", "High": "P2", "Medium": "P3", "Low": "P4"},
+  "priority_rules": [
+    {"id": "P-BASE", "rule": "Base priority from severity: Critical->P1, High->P2, Medium->P3, Low->P4."},
+    {"id": "P-SCOPE", "rule": "If scope = WIDESPREAD and severity is Medium or higher, raise priority by one level (e.g. P3->P2)."},
+    {"id": "P-VERIFY", "rule": "If the evidence is still insufficient after the Agent1<->Agent2 revision loop, priority is capped at P3 (provisional) until clarified."}
+  ],
+  "insufficient_evidence_priority_cap": "P3"
+}

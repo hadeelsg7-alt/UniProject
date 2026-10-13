@@ -1,0 +1,61 @@
+{
+  "_about": "Local knowledge base of service-quality dimensions used by Agent 1 (EGSQUAL lookup tool). The dimensions are ADAPTED for e-government mobile services from E-S-QUAL / E-RecS-QUAL (Parasuraman, Zeithaml & Malhotra, 2005) and e-GovQual (Papadomichelaki & Mentzas, 2012). IMPORTANT: verify these definitions against the exact EGSQUAL source cited in your thesis and edit this file if needed - the code reads dimension keys, names and keywords from here, so no code change is required.",
+  "dimensions": {
+    "EFFICIENCY": {
+      "name_en": "Efficiency (Ease of Use)",
+      "name_ar": "الكفاءة وسهولة الاستخدام",
+      "definition": "The ease and speed with which beneficiaries can access the app, navigate it and complete a task with minimal effort (clear steps, intuitive interface, quick access).",
+      "source": "E-S-QUAL: Efficiency; e-GovQual: Efficiency",
+      "keywords_ar": ["سهل", "صعب", "معقد", "واجهه", "تصميم", "خطوات", "بطيء", "بطء", "ثقيل", "سريع", "البصمه", "حفظ", "اختيار", "تنقل"],
+      "example_issues": ["Too many steps to log in", "Slow screens", "Confusing navigation"]
+    },
+    "SYSTEM_AVAILABILITY": {
+      "name_en": "System Availability (Technical Reliability)",
+      "name_ar": "توفر النظام والاعتمادية التقنية",
+      "definition": "The correct technical functioning of the app: it opens, stays up, does not freeze or crash, authentication and verification codes work, and error messages do not prevent use.",
+      "source": "E-S-QUAL: System Availability; e-GovQual: Reliability",
+      "keywords_ar": ["يعلق", "يقفل", "لا يعمل", "ما يشتغل", "خطا", "عطل", "تحديث", "تسجيل الدخول", "رمز التحقق", "نفاذ", "ما يفتح"],
+      "example_issues": ["App crashes on launch", "Verification code (OTP) not received", "Login error"]
+    },
+    "FULFILLMENT": {
+      "name_en": "Fulfillment (Service Completion)",
+      "name_ar": "إنجاز الخدمة والوفاء بها",
+      "definition": "The extent to which the digital service is actually delivered as promised: transactions, payments, registrations and requests are completed accurately, and the expected service options exist.",
+      "source": "E-S-QUAL: Fulfillment; e-GovQual: Reliability (service delivered as promised)",
+      "keywords_ar": ["لم يتم", "ما تم", "سداد", "دفع", "الرسوم", "طلب", "تسجيل", "اصدار", "تجديد", "حجز", "بلاغ", "خدمه غير متوفره"],
+      "example_issues": ["Fees paid but registration not completed", "Request submitted but never processed"]
+    },
+    "PRIVACY_SECURITY": {
+      "name_en": "Privacy & Security (Trust)",
+      "name_ar": "الخصوصية والأمان (الثقة)",
+      "definition": "The degree to which the app is safe and protects beneficiaries' personal and financial information, and beneficiaries trust it with their data.",
+      "source": "E-S-QUAL: Privacy; e-GovQual: Trust",
+      "keywords_ar": ["خصوصيه", "امان", "غير امن", "اختراق", "بيانات شخصيه", "تسريب", "صلاحيات"],
+      "example_issues": ["App requests unnecessary permissions", "Concern about data leakage"]
+    },
+    "RESPONSIVENESS": {
+      "name_en": "Responsiveness (Problem & Complaint Handling)",
+      "name_ar": "الاستجابة ومعالجة المشكلات والشكاوى",
+      "definition": "Effective handling of beneficiaries' problems, complaints and reports: timely responses, follow-up, and transparency about the outcome.",
+      "source": "E-RecS-QUAL: Responsiveness; e-GovQual: Citizen Support",
+      "keywords_ar": ["ما يردون", "لا يرد", "لا يتجاوب", "شكوى", "بلاغ", "متابعه", "اغلاق البلاغ", "بدون اجراء"],
+      "example_issues": ["Complaints closed without action", "No response from the complaints team"]
+    },
+    "CONTACT": {
+      "name_en": "Contact (Access to Support)",
+      "name_ar": "التواصل والوصول إلى الدعم",
+      "definition": "Availability of channels to reach the service provider (in-app support, phone, chat, complaint form) and the ability to talk to a person when needed.",
+      "source": "E-RecS-QUAL: Contact; e-GovQual: Citizen Support",
+      "keywords_ar": ["خدمه العملاء", "الدعم", "تواصل", "رقم", "اتصال", "محادثه", "خانه للشكوى"],
+      "example_issues": ["No in-app complaint channel", "Support phone not reachable"]
+    },
+    "INFORMATION_QUALITY": {
+      "name_en": "Information Quality",
+      "name_ar": "جودة المعلومات",
+      "definition": "Accuracy, completeness, clarity and currency of the information and content shown in the app, including correct language/localisation and up-to-date data.",
+      "source": "e-GovQual: Efficiency (information quality sub-dimension)",
+      "keywords_ar": ["معلومات", "البيانات", "غير صحيح", "لا تتحدث", "اللغه", "الانجليزيه", "العربيه", "توضيح", "شرح"],
+      "example_issues": ["Data not updated", "Arabic UI shows English options"]
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "_about": "PROPOSED, CONFIGURABLE escalation-eligibility rules for the research prototype (Agent 3). These are NOT official rules of the Saudi Digital Government Authority (DGA) or of the AMER / Balaagh Digital service. Replace them only with rules supported by verified official documentation. The prototype only SIMULATES escalation; it never submits anything to a government system.",
+  "external_channel_label": "AMER / Balaagh Digital (DGA) - SIMULATED ONLY",
+  "require_human_approval": true,
+  "min_severity_for_escalation": "High",
+  "default_response_sla_days": 5,
+  "default_sla_note": "Default SLA (days) is a placeholder used only when a complaint record has no SLA of its own. Replace it with the service provider's published SLA if available.",
+  "unresolved_statuses": ["Open", "Open - No Response", "In Progress", "Closed - Unresolved", "Reopened"],
+  "rules": [
+    {"id": "E1", "description": "A previous complaint about the same problem was submitted to the service provider first (a reference that can be verified exists)."},
+    {"id": "E2", "description": "The previous complaint is still unresolved, or was closed without resolution."},
+    {"id": "E3", "description": "The applicable SLA response deadline for that complaint has passed."},
+    {"id": "E4", "description": "The current issue severity is at or above the configured minimum (default: High)."},
+    {"id": "E5", "description": "A human officer approves before any external escalation (always mandatory)."}
+  ],
+  "required_fields_for_escalation": ["complaint_reference", "complaint_status", "submission_date", "sla_response_days"]
+}

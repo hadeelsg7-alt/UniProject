@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+# research dataset is kept out of version control; place it at data/reviews.csv
+data/*.csv
+outputs/*.json
+outputs/*.csv
+!outputs/.gitkeep
+.streamlit/secrets.toml

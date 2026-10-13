@@ -1,0 +1,25 @@
+{
+  "_about": "SYNTHETIC complaint-history records created ONLY to demonstrate Agent 3's escalation logic. They are not real complaints, real complaint numbers, or real statuses. Every reference starts with 'SYN-'. Real deployments would replace this file with a connector to the service provider's own CRM.",
+  "records": [
+    {
+      "complaint_reference": "SYN-2026-0417",
+      "app_id": "SYNTHETIC-APP",
+      "issue_summary": "Payment deducted but service request not completed",
+      "submission_date": "2026-01-05",
+      "complaint_status": "Open - No Response",
+      "last_update_date": "2026-01-05",
+      "sla_response_days": 5,
+      "synthetic": true
+    },
+    {
+      "complaint_reference": "SYN-2026-0521",
+      "app_id": "SYNTHETIC-APP",
+      "issue_summary": "Verification code not received",
+      "submission_date": "2026-01-18",
+      "complaint_status": "In Progress",
+      "last_update_date": "2026-01-19",
+      "sla_response_days": 5,
+      "synthetic": true
+    }
+  ]
+}

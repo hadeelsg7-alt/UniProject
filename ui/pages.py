@@ -97,6 +97,75 @@ def review_picker(prefix: str, limit: int = 500) -> Optional[pd.DataFrame]:
     return sub
 
 
+def agent_results(states: list[WorkflowState], key: str, show_rating_chart: bool = True) -> None:
+    """KPIs and charts grouped by the agent that produced them, each in that agent's coloured frame."""
+    rows = pd.DataFrame([state_to_row(s) for s in states])
+    iss = issue_frame(states)
+    n = max(len(rows), 1)
+    A1, A2, A3 = (C.AGENTS[k]["color"] for k in ("Agent1", "Agent2", "Agent3"))
+
+    C.kpi_row([("Reviews analysed", len(rows), f"{rows['review_id'].nunique()} unique · input to all three agents", "navy")])
+    st.write("")
+
+    # ---- Agent 1: Investigation -------------------------------------------
+    with st.container(key=f"frame_Agent1_res_{key}"):
+        C.agent_section_header("Agent1", "issues, feedback types, EGSQUAL dimensions, ambiguity")
+        C.kpi_row([("Issues extracted", len(iss), f"{len(iss) / n:.2f} per review"),
+                   ("Multi-issue reviews", int((rows["n_issues"] >= 2).sum()), "2+ independent issues"),
+                   ("Need clarification", int((rows["analysis_status"] == "NEEDS_CLARIFICATION").sum()), "ambiguous / incomplete")])
+        st.write("")
+        g1, g2 = st.columns(2)
+        with g1, st.container(border=True):
+            st.markdown("**Feedback categories** · primary type per review")
+            st.altair_chart(CH.single_hue_bars(rows["feedback_type"], A1, "Reviews"), width="stretch")
+        with g2, st.container(border=True):
+            st.markdown("**Service-quality dimensions (EGSQUAL)** · per extracted issue")
+            if iss.empty:
+                st.caption("No issues extracted yet.")
+            else:
+                st.altair_chart(CH.single_hue_bars(iss["dimension"], A1, "Issues"), width="stretch")
+
+    # ---- Agent 2: Impact --------------------------------------------------
+    with st.container(key=f"frame_Agent2_res_{key}"):
+        C.agent_section_header("Agent2", "severity, priority, sentiment vs severity, review requests")
+        hi = int(iss["severity"].isin(["High", "Critical"]).sum())
+        urgent = int(iss["priority"].isin(["P1", "P2"]).sum())
+        C.kpi_row([("High / Critical issues", hi, f"{hi / max(len(iss), 1) * 100:.0f}% of issues"),
+                   ("P1 / P2 issues", urgent, "urgent priorities"),
+                   ("Revision requests", int((rows["revision_rounds"] > 0).sum()), "reviews sent back to the Investigation Agent")])
+        st.write("")
+        g3, g4 = st.columns(2)
+        with g3, st.container(border=True):
+            st.markdown("**Issue severity** · operational impact (rules R1–R4)")
+            st.altair_chart(CH.severity_bars(iss["severity"]), width="stretch")
+        with g4, st.container(border=True):
+            st.markdown("**Issue priority** · P1 (most urgent) → P4")
+            st.altair_chart(CH.priority_bars(iss["priority"]), width="stretch")
+        if show_rating_chart:
+            with st.container(border=True):
+                st.markdown("**Severity is not the star rating** · share of each overall severity within each rating")
+                st.altair_chart(CH.severity_by_rating(rows), width="stretch")
+                st.caption("'No severity' = no concrete operational issue was found (e.g. praise or vague complaints).")
+
+    # ---- Agent 3: Resolution ----------------------------------------------
+    with st.container(key=f"frame_Agent3_res_{key}"):
+        C.agent_section_header("Agent3", "recommended actions, escalation eligibility, simulated tickets")
+        tickets = sum(1 for s in states if s.agent3 and s.agent3.ticket)
+        esc_n = int(rows["escalation_status"].isin(["CANDIDATE_AWAITING_HUMAN_APPROVAL", "PENDING_VERIFICATION"]).sum())
+        C.kpi_row([("Simulated tickets", tickets, "none submitted externally"),
+                   ("Escalation candidate / pending", esc_n, "always needs human approval"),
+                   ("No action required", int((rows["action"] == "No action required").sum()), "e.g. praise only")])
+        st.write("")
+        g5, g6 = st.columns(2)
+        with g5, st.container(border=True):
+            st.markdown("**Recommended action** · per review")
+            st.altair_chart(CH.single_hue_bars(rows["action"], A3, "Reviews"), width="stretch")
+        with g6, st.container(border=True):
+            st.markdown("**Escalation status** · per review (simulated)")
+            st.altair_chart(CH.single_hue_bars(rows["escalation_status"], A3, "Reviews"), width="stretch")
+    return rows
+
+
 # =========================================================================== #
 # 1. Overview dashboard
 # =========================================================================== #
@@ -153,47 +222,7 @@ def page_dashboard() -> None:
         C.empty_state("📊", "No analysis yet", "Run a sample above, analyse a single review, or run a batch — the KPIs and charts "
                       "are computed from those real results only.")
         return
-    rows = pd.DataFrame([state_to_row(s) for s in states])
-    iss = issue_frame(states)
-    tickets = sum(1 for s in states if s.agent3 and s.agent3.ticket)
-    hi = int(iss["severity"].isin(["High", "Critical"]).sum())
-    urgent = int(iss["priority"].isin(["P1", "P2"]).sum())
-    C.kpi_row([("Reviews analysed", len(rows), f"{rows['review_id'].nunique()} unique"),
-               ("Issues extracted", len(iss), f"{len(iss) / max(len(rows), 1):.2f} per review"),
-               ("High / Critical", hi, f"{hi / max(len(iss), 1) * 100:.0f}% of issues", "crit"),
-               ("P1 / P2 issues", urgent, "urgent priorities", "warn"),
-               ("Simulated tickets", tickets, "none submitted externally", "navy"),
-               ("Revision loops", int((rows["revision_rounds"] > 0).sum()), "Impact → Investigation Agent", "warn")])
-    st.write("")
-    g1, g2 = st.columns(2)
-    with g1:
-        with st.container(border=True):
-            st.markdown("**Feedback categories** · primary type per review")
-            st.altair_chart(CH.single_hue_bars(rows["feedback_type"], T.TEAL, "Reviews"), width="stretch")
-    with g2:
-        with st.container(border=True):
-            st.markdown("**Service-quality dimensions** · per extracted issue")
-            if iss.empty:
-                st.caption("No issues extracted yet.")
-            else:
-                st.altair_chart(CH.single_hue_bars(iss["dimension"], T.NAVY_2, "Issues"), width="stretch")
-    g3, g4 = st.columns(2)
-    with g3:
-        with st.container(border=True):
-            st.markdown("**Issue priority** · P1 (most urgent) → P4")
-            st.altair_chart(CH.priority_bars(iss["priority"]), width="stretch")
-    with g4:
-        with st.container(border=True):
-            st.markdown("**Issue severity** · operational impact (rules R1–R4)")
-            st.altair_chart(CH.severity_bars(iss["severity"]), width="stretch")
-    with st.container(border=True):
-        st.markdown("**Severity is not the star rating** · share of each overall severity within each rating")
-        st.altair_chart(CH.severity_by_rating(rows), width="stretch")
-        st.caption("'No severity' = no concrete operational issue was found (e.g. praise or vague complaints).")
-    with st.expander("Escalation and action breakdown"):
-        a, b = st.columns(2)
-        a.altair_chart(CH.single_hue_bars(rows["action"], T.TEAL, "Reviews"), width="stretch")
-        b.altair_chart(CH.single_hue_bars(rows["escalation_status"], T.NAVY_2, "Reviews"), width="stretch")
+    agent_results(states, "dash")
 
 
 # =========================================================================== #
@@ -326,21 +355,8 @@ def page_batch() -> None:
     states = st.session_state.get("batch_states")
     if not states:
         return
-    rows = pd.DataFrame([state_to_row(s) for s in states])
-    iss = issue_frame(states)
-    C.kpi_row([("Reviews", len(rows), "analysed"), ("Issues", len(iss), "extracted"),
-               ("Need clarification", int((rows["analysis_status"] == "NEEDS_CLARIFICATION").sum()), "Agent 1 status", "warn"),
-               ("Revision loops", int((rows["revision_rounds"] > 0).sum()), "Impact → Investigation Agent", "warn"),
-               ("Escalation candidate / pending", int(rows["escalation_status"].isin(["CANDIDATE_AWAITING_HUMAN_APPROVAL", "PENDING_VERIFICATION"]).sum()), "simulated", "crit")])
-    g1, g2 = st.columns(2)
-    with g1:
-        with st.container(border=True):
-            st.markdown("**Issue severity**")
-            st.altair_chart(CH.severity_bars(iss["severity"]), width="stretch")
-    with g2:
-        with st.container(border=True):
-            st.markdown("**Recommended action**")
-            st.altair_chart(CH.single_hue_bars(rows["action"], T.TEAL, "Reviews"), width="stretch")
+    rows = agent_results(states, "batch", show_rating_chart=False)
+    C.section("All results")
     st.dataframe(rows[["review_id", "app_id", "rating", "review_text", "feedback_type", "n_issues", "overall_severity",
                        "overall_priority", "revision_rounds", "action", "escalation_status"]], hide_index=True, width="stretch", height=320)
     d1, d2 = st.columns(2)

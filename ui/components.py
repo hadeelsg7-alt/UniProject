@@ -177,6 +177,16 @@ def agents_overview(compact: bool = False) -> None:
     md('<div class="agent-row">' + '<div class="agent-arrow">➜</div>'.join(cards) + "</div>")
 
 
+def agent_section_header(key: str, what: str) -> None:
+    """Header shown at the top of an agent's framed results block."""
+    a = AGENTS[key]
+    md(f'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">'
+       f'<span class="agent-tag" style="background:{a["color"]};font-size:0.8rem;padding:4px 10px">AGENT {a["num"]}</span>'
+       f'<span class="agent-title" style="font-size:1.15rem">{a["icon"]} {esc(a["full"])}</span>'
+       f'<span class="agent-ar" style="font-size:1rem">{esc(a["ar"])}</span></div>'
+       f'<div class="small" style="margin:-2px 0 10px 0">Results produced by this agent: {esc(what)}</div>')
+
+
 # --------------------------------------------------------------------------- #
 # Workflow diagram (driven only by the real node trace)
 # --------------------------------------------------------------------------- #

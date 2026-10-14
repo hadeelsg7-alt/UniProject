@@ -159,6 +159,7 @@ section[data-testid="stSidebar"] a[data-testid="stSidebarNavLink"][aria-current=
 [class*="st-key-frame_Agent"] .decision,
 [class*="st-key-frame_Agent"] .ticket {{ border-left: 2px solid var(--agent) !important; }}
 [class*="st-key-frame_Agent"] .ticket .th {{ background: var(--agent) !important; }}
+[class*="st-key-frame_Agent"] .kpi {{ border-top-color: var(--agent) !important; border-color: var(--agent); }}
 /* Messages timeline */
 .msg {{ display:flex; gap: 12px; margin-bottom: 10px; }}
 .msg .dot {{ width: 36px; height: 36px; font-size: 1.05rem; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:#fff;

@@ -54,7 +54,7 @@ def render_result(state: WorkflowState, llm, key: str) -> None:
              f'<div class="small" style="margin-top:8px">{C.esc(a3.action_rationale)}</div></div>')
     with c2:
         C.kpi_row([("Issues", len(a1.issues), a1.feedback_type), ("Revision rounds", f"{state.revision_count}/{state.max_revisions}",
-                    "Agent 2 → Agent 1", "warn" if state.revision_count else ""), ("Tools called", len(state.tool_calls), "audited")])
+                    "Impact → Investigation Agent", "warn" if state.revision_count else ""), ("Tools called", len(state.tool_calls), "audited")])
 
     # ---- Workflow + step replay -------------------------------------------
     C.section("Multi-agent workflow", "driven by the real execution trace")
@@ -70,14 +70,15 @@ def render_result(state: WorkflowState, llm, key: str) -> None:
         st.markdown(f"**Step {k + 1} · {C.NODE_LABEL.get(node, node)}** — {hi - lo} log entr{'y' if hi - lo == 1 else 'ies'}")
         entries = state.decision_log[lo:hi]
         if entries:
-            st.dataframe(pd.DataFrame([{"agent": e.agent, "action": e.action, "detail": e.detail} for e in entries]),
+            st.dataframe(pd.DataFrame([{"agent": C.agent_name(e.agent), "action": e.action, "detail": e.detail} for e in entries]),
                          hide_index=True, width="stretch", height=min(320, 38 + 35 * len(entries)))
     else:
         C.workflow_diagram(state, llm=llm)
 
     # ---- Agent panels -----------------------------------------------------
-    t1, t2, t3, t4, t5, t6 = st.tabs(["🔵 Agent 1 · Investigation", "🟠 Agent 2 · Impact", "🟢 Agent 3 · Resolution",
-                                       "💬 Communication", "🧾 Audit trail", "⬇️ Export"])
+    t1, t2, t3, t4, t5, t6 = st.tabs(["🔍 Agent 1 · Investigation Agent", "⚖️ Agent 2 · Impact Agent", "🎫 Agent 3 · Resolution Agent",
+                                       "💬 Communication", "🧾 Audit trail", "⬇️ Export"],
+                                      key=f"tabs_{key}", on_change="rerun")  # remember the open tab across reruns
     with t1:
         _agent1_panel(state, llm)
     with t2:
@@ -90,13 +91,17 @@ def render_result(state: WorkflowState, llm, key: str) -> None:
                    f"path: {' → '.join(state.node_trace)}")
         C.message_timeline(state.messages)
     with t5:
-        agents = ["All", "Orchestrator", "Agent1", "Agent2", "Agent3"]
-        who = st.segmented_control("Filter by agent", agents, default="All", key=f"who_{key}")
+        names = {"All": "All", "Orchestrator": "Orchestrator", **{k: C.agent_name(k) for k in C.AGENTS}}
+        who = st.segmented_control("Filter by agent", list(names), default="All", key=f"who_{key}",
+                                   format_func=lambda k: names[k])
         log = pd.DataFrame([e.model_dump() for e in state.decision_log])
         tl = pd.DataFrame([t.model_dump() for t in state.tool_calls])
         if who and who != "All":
             log = log[log["agent"] == who]
             tl = tl[tl["agent"] == who] if not tl.empty else tl
+        log = log.assign(agent=log["agent"].map(C.agent_name))
+        if not tl.empty:
+            tl = tl.assign(agent=tl["agent"].map(C.agent_name))
         st.markdown(f"**Decision log** ({len(log)})")
         st.dataframe(log[["step", "agent", "action", "detail"]], hide_index=True, width="stretch", height=300)
         st.markdown(f"**Tool calls** ({len(tl)})")
@@ -116,8 +121,13 @@ def render_result(state: WorkflowState, llm, key: str) -> None:
 
 def _agent_header(state, agent: str, title: str, llm) -> None:
     label, kind = C.agent_reasoner(state, agent, llm)
-    C.md(f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
-         f'<h4 style="margin:4px 0">{C.esc(title)}</h4><div>Produced by: {C.pill(label, kind)}</div></div>')
+    a = C.AGENTS[agent]
+    C.md(f'<div class="card" style="border-left:6px solid {a["color"]};display:flex;justify-content:space-between;align-items:center;'
+         f'flex-wrap:wrap;gap:10px"><div><span class="agent-tag" style="background:{a["color"]}">AGENT {a["num"]}</span>'
+         f'<div class="agent-title" style="font-size:1.2rem">{a["icon"]} {C.esc(a["full"])}</div>'
+         f'<div class="agent-ar" style="text-align:left">{C.esc(a["ar"])}</div>'
+         f'<div class="small" style="margin-top:4px">{C.esc(a["role"])}</div></div>'
+         f'<div>Produced by: {C.pill(label, kind)}</div></div>')
 
 
 def _agent1_panel(state, llm) -> None:
@@ -154,10 +164,10 @@ def _agent2_panel(state, llm) -> None:
     req = [m for m in state.messages if m.message_type == "REVIEW_REQUEST"]
     if req:
         codes = sorted({m.concern_code for m in req})
-        st.error(f"**Agent 2 requested a revision from Agent 1** — {len(req)} concern(s) over {state.revision_count} round(s): "
+        st.error(f"**The Impact Agent (2) asked the Investigation Agent (1) to revise** — {len(req)} concern(s) over {state.revision_count} round(s): "
                  f"{', '.join(codes)}. See the Communication tab for the full exchange.", icon=":material/sync_problem:")
     else:
-        st.success("**No revision requested** — Agent 2 found Agent 1's evidence sufficient on the first pass.", icon=":material/check_circle:")
+        st.success("**No revision requested** — the Impact Agent found the Investigation Agent's evidence sufficient on the first pass.", icon=":material/check_circle:")
 
     c1, c2 = st.columns(2)
     sev = a2.overall_severity.value if a2.overall_severity else None

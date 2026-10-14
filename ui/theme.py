@@ -136,9 +136,17 @@ section[data-testid="stSidebar"] a[data-testid="stSidebarNavLink"][aria-current=
 .wf-loop .lp.none {{ border-color: #C2D1C8; color: var(--muted); background: #F9FCFA; font-weight: 500; }}
 .wf-loop .count {{ display:inline-block; background:#D03B3B; color:#fff; border-radius: 999px; padding: 0 9px; margin-left: 6px; }}
 
+/* Agent identity */
+.agent-row {{ display:flex; align-items:stretch; gap:0; margin: 4px 0 14px 0; }}
+.agent-card {{ flex:1; background:#fff; border:1px solid var(--border); border-top:5px solid var(--teal); border-radius:14px; padding:12px 14px; }}
+.agent-arrow {{ display:flex; align-items:center; padding: 0 8px; color: var(--teal); font-size:1.4rem; font-weight:700; }}
+.agent-tag {{ display:inline-block; color:#fff; font-size:0.68rem; font-weight:800; letter-spacing:.08em; padding:2px 8px; border-radius:6px; margin-bottom:4px; }}
+.agent-title {{ font-weight:700; color: var(--navy); font-size:1.02rem; }}
+.agent-ar {{ direction: rtl; text-align: right; font-family:'IBM Plex Sans Arabic', Tahoma, sans-serif; color: var(--ink2); font-size: 0.95rem; }}
+.agent-ar.small-ar {{ font-size: 0.85rem; text-align: left; direction: rtl; unicode-bidi: plaintext; }}
 /* Messages timeline */
 .msg {{ display:flex; gap: 12px; margin-bottom: 10px; }}
-.msg .dot {{ width: 34px; height: 34px; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:#fff;
+.msg .dot {{ width: 36px; height: 36px; font-size: 1.05rem; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:#fff;
             font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }}
 .msg .body {{ background:#fff; border:1px solid var(--border); border-radius: 12px; padding: 8px 12px; flex: 1; }}
 .msg .meta {{ font-size: 0.76rem; color: var(--muted); margin-bottom: 2px; }}
@@ -165,7 +173,7 @@ section[data-testid="stSidebar"] a[data-testid="stSidebarNavLink"][aria-current=
 .empty {{ text-align:center; color: var(--ink2); background:#fff; border:1px dashed #C2D1C8; border-radius: 14px; padding: 28px 18px; }}
 .empty .big {{ font-size: 1.8rem; }}
 textarea {{ unicode-bidi: plaintext; text-align: start; font-size: 1.05rem !important; }}
-@media (max-width: 900px) {{ .wf {{ flex-wrap: wrap; }} .wf-node, .wf-node.io {{ max-width: 100%; flex-basis: 100%; }} .wf-arrow {{ width:100%; transform: rotate(90deg); height: 30px; }}
+@media (max-width: 900px) {{ .agent-row {{ flex-direction: column; }} .agent-arrow {{ transform: rotate(90deg); justify-content:center; }} .wf {{ flex-wrap: wrap; }} .wf-node, .wf-node.io {{ max-width: 100%; flex-basis: 100%; }} .wf-arrow {{ width:100%; transform: rotate(90deg); height: 30px; }}
                              .wf-loop .lp {{ min-width: 0; width: 100%; }} .kv {{ grid-template-columns: 1fr; }} }}
 </style>
 """

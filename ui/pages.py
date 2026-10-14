@@ -106,6 +106,8 @@ def page_dashboard() -> None:
            "Multi-agent analysis of Saudi government mobile-app reviews: issue investigation, impact prioritisation and simulated resolution.",
            ["3 cooperating agents", "EGSQUAL dimensions", "Evidence-grounded", "Human-in-the-loop", "Simulated escalation only"])
     C.mode_banner(c.llm)
+    C.section("The three agents", "who does what")
+    C.agents_overview()
 
     C.section("Dataset", "the uploaded corpus (no ground-truth labels)")
     if c.info:
@@ -161,7 +163,7 @@ def page_dashboard() -> None:
                ("High / Critical", hi, f"{hi / max(len(iss), 1) * 100:.0f}% of issues", "crit"),
                ("P1 / P2 issues", urgent, "urgent priorities", "warn"),
                ("Simulated tickets", tickets, "none submitted externally", "navy"),
-               ("Revision loops", int((rows["revision_rounds"] > 0).sum()), "Agent 2 → Agent 1", "warn")])
+               ("Revision loops", int((rows["revision_rounds"] > 0).sum()), "Impact → Investigation Agent", "warn")])
     st.write("")
     g1, g2 = st.columns(2)
     with g1:
@@ -210,6 +212,7 @@ def page_analyze() -> None:
     C.hero("Analyse Beneficiary Feedback", "Type an Arabic review, pick one from the dataset or upload a CSV — then watch the three agents work.",
            ["RTL Arabic", "Saudi dialect", "Live agent trace"])
     C.mode_banner(c.llm)
+    C.agents_overview(compact=True)
     mode = st.segmented_control("Input", ["✍️ Type a review", "📚 Pick from dataset", "📤 Upload CSV"],
                                 default="✍️ Type a review", key="an_mode")
     review: Optional[ReviewInput] = None
@@ -327,7 +330,7 @@ def page_batch() -> None:
     iss = issue_frame(states)
     C.kpi_row([("Reviews", len(rows), "analysed"), ("Issues", len(iss), "extracted"),
                ("Need clarification", int((rows["analysis_status"] == "NEEDS_CLARIFICATION").sum()), "Agent 1 status", "warn"),
-               ("Revision loops", int((rows["revision_rounds"] > 0).sum()), "Agent 2 → Agent 1", "warn"),
+               ("Revision loops", int((rows["revision_rounds"] > 0).sum()), "Impact → Investigation Agent", "warn"),
                ("Escalation candidate / pending", int(rows["escalation_status"].isin(["CANDIDATE_AWAITING_HUMAN_APPROVAL", "PENDING_VERIFICATION"]).sum()), "simulated", "crit")])
     g1, g2 = st.columns(2)
     with g1:

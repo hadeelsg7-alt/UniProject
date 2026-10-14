@@ -146,11 +146,44 @@ def review_with_evidence(text: str, issues: list) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Agent identities (single source of truth for names shown in the UI)
+# --------------------------------------------------------------------------- #
+AGENTS = {
+    "Agent1": {"num": 1, "icon": "🔍", "name": "Investigation Agent", "full": "Feedback Investigation Agent",
+               "ar": "وكيل تحليل الملاحظات", "color": "#2A78D6",
+               "role": "Reads the Arabic review, extracts each issue with verbatim evidence and its EGSQUAL dimension, flags ambiguity."},
+    "Agent2": {"num": 2, "icon": "⚖️", "name": "Impact Agent", "full": "Impact Assessment & Prioritization Agent",
+               "ar": "وكيل تقييم الأثر والأولوية", "color": "#C97E00",
+               "role": "Judges operational impact, sets severity and priority by rule, and asks the Investigation Agent to re-check weak evidence."},
+    "Agent3": {"num": 3, "icon": "🎫", "name": "Resolution Agent", "full": "Resolution & Escalation Agent",
+               "ar": "وكيل المعالجة والتصعيد", "color": "#0F7A51",
+               "role": "Decides the action, checks complaint history, SLA and escalation rules, and drafts a simulated ticket."},
+}
+
+
+def agent_name(key: str, short: bool = True) -> str:
+    """'Agent1' -> 'Investigation Agent'; other senders (Human officer, Orchestrator) unchanged."""
+    a = AGENTS.get(key)
+    return (a["name"] if short else a["full"]) if a else key
+
+
+def agents_overview(compact: bool = False) -> None:
+    cards = []
+    for key, a in AGENTS.items():
+        role = "" if compact else f'<div class="small" style="margin-top:6px">{esc(a["role"])}</div>'
+        cards.append(f'<div class="agent-card" style="border-top-color:{a["color"]}"><div class="agent-tag" style="background:{a["color"]}">'
+                     f'AGENT {a["num"]}</div><div class="agent-title">{a["icon"]} {esc(a["full"])}</div>'
+                     f'<div class="agent-ar">{esc(a["ar"])}</div>{role}</div>')
+    md('<div class="agent-row">' + '<div class="agent-arrow">➜</div>'.join(cards) + "</div>")
+
+
+# --------------------------------------------------------------------------- #
 # Workflow diagram (driven only by the real node trace)
 # --------------------------------------------------------------------------- #
 NODE_AGENT = {"A1_ANALYZE": "A1", "A1_REVIEW_RESPONSE": "A1", "A2_ASSESS": "A2", "A3_RESOLVE": "A3", "END": "OUT"}
-NODE_LABEL = {"A1_ANALYZE": "Agent 1 analyses the review", "A2_ASSESS": "Agent 2 assesses impact",
-              "A1_REVIEW_RESPONSE": "Agent 1 answers Agent 2's review request", "A3_RESOLVE": "Agent 3 decides the action",
+NODE_LABEL = {"A1_ANALYZE": "Investigation Agent (1) analyses the review", "A2_ASSESS": "Impact Agent (2) assesses impact",
+              "A1_REVIEW_RESPONSE": "Investigation Agent (1) answers the Impact Agent's review request",
+              "A3_RESOLVE": "Resolution Agent (3) decides the action",
               "END": "Decision handed to the human officer"}
 
 
@@ -208,8 +241,11 @@ def workflow_diagram(state, step: Optional[int] = None, live_node: Optional[str]
         s = status(agent_key)
         if live_node is not None and s == "active":
             out = "Working on it now…"
-        return (f'<div class="wf-node {s}"><div class="st">{st_lbl[s]}</div><div class="t">{title}</div>'
-                f'<div class="r">{role}</div><div class="o">{out}</div>{badge(agent_name)}</div>')
+        a = AGENTS[agent_name]
+        return (f'<div class="wf-node {s}" style="border-top:5px solid {a["color"]}"><div class="st">{st_lbl[s]}</div>'
+                f'<div class="agent-tag" style="background:{a["color"]}">AGENT {a["num"]}</div>'
+                f'<div class="t">{a["icon"]} {esc(a["name"])}</div><div class="agent-ar small-ar">{esc(a["ar"])}</div>'
+                f'<div class="o" style="margin-top:6px">{out}</div>{badge(agent_name)}</div>')
 
     snippet = esc(state.review.text.strip()[:70]) + ("…" if len(state.review.text.strip()) > 70 else "")
     out_done = "OUT" in [NODE_AGENT.get(n) for n in seen]
@@ -225,10 +261,10 @@ def workflow_diagram(state, step: Optional[int] = None, live_node: Optional[str]
     requests = [m for m in state.messages if m.message_type == "REVIEW_REQUEST" and m.round <= rounds]
     if rounds:
         codes = ", ".join(sorted({m.concern_code for m in requests if m.concern_code}))
-        loop = (f'<div class="lp">⟲ Agent 2 → Agent 1 revision request<span class="count">{rounds} / {state.max_revisions} round(s)</span>'
+        loop = (f'<div class="lp">⟲ Impact Agent (2) → Investigation Agent (1): revision request<span class="count">{rounds} / {state.max_revisions} round(s)</span>'
                 f'<br><span style="font-weight:500">Concerns raised: {esc(codes) or "—"}</span></div>')
     else:
-        loop = ('<div class="lp none">⟲ Agent 2 → Agent 1 revision loop: '
+        loop = ('<div class="lp none">⟲ Impact Agent → Investigation Agent revision loop: '
                 + ("no revision was requested in this run" if finished or out_done else "not triggered so far") + "</div>")
 
     md('<div class="wf">'
@@ -308,12 +344,13 @@ def message_timeline(messages) -> None:
     rows = []
     for m in messages:
         cls = {"REVIEW_REQUEST": "req", "REVIEW_RESPONSE": "resp"}.get(m.message_type, "")
-        color = AGENT_COLOR.get(m.sender, "#4A5E55")
+        color = AGENTS[m.sender]["color"] if m.sender in AGENTS else AGENT_COLOR.get(m.sender, "#4A5E55")
+        dot = AGENTS[m.sender]["icon"] if m.sender in AGENTS else "👤"
         kind = {"REVIEW_REQUEST": "bad", "REVIEW_RESPONSE": "teal", "HANDOFF": "navy"}[m.message_type]
         extra = (pill(m.concern_code, "outline") if m.concern_code else "") + "".join(pill(i, "muted") for i in m.issue_ids)
         rnd = f" &middot; round {m.round}" if m.round else ""
-        rows.append(f'<div class="msg {cls}"><div class="dot" style="background:{color}">{esc(m.sender[-1] if m.sender.startswith("Agent") else "H")}</div>'
-                    f'<div class="body"><div class="meta"><b>{esc(m.sender)}</b> → <b>{esc(m.receiver)}</b>{rnd} {pill(m.message_type, kind)} {extra}</div>'
+        rows.append(f'<div class="msg {cls}"><div class="dot" style="background:{color}">{dot}</div>'
+                    f'<div class="body"><div class="meta"><b>{esc(agent_name(m.sender))}</b> → <b>{esc(agent_name(m.receiver))}</b>{rnd} {pill(m.message_type, kind)} {extra}</div>'
                     f'<div>{esc(m.content)}</div></div></div>')
     md("".join(rows))
 

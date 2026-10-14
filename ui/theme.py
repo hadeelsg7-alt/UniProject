@@ -121,9 +121,9 @@ section[data-testid="stSidebar"] a[data-testid="stSidebarNavLink"][aria-current=
 .wf-node .r {{ color: var(--muted); font-size: 0.75rem; margin-bottom: 6px; }}
 .wf-node .o {{ font-size: 0.8rem; color: var(--ink); line-height: 1.45; }}
 .wf-node .st {{ position:absolute; top: -11px; right: 10px; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }}
-.wf-node.done {{ border-color: #82C9A3; }}
+.wf-node.done {{ }}
 .wf-node.done .st {{ background: var(--teal); color:#fff; }}
-.wf-node.active {{ border-color: var(--teal); box-shadow: 0 0 0 4px rgba(15,122,81,0.18), 0 8px 22px rgba(14,59,44,0.12); transform: translateY(-2px); }}
+.wf-node.active {{ box-shadow: 0 0 0 4px rgba(15,122,81,0.18), 0 8px 22px rgba(14,59,44,0.12); transform: translateY(-2px); }}
 .wf-node.active .st {{ background: #FAB219; color:#1B1B1B; animation: pulse 1.2s infinite; }}
 .wf-node.pending {{ opacity: 0.55; }}
 .wf-node.pending .st {{ background: #E5EEE8; color: var(--ink2); }}
@@ -144,6 +144,21 @@ section[data-testid="stSidebar"] a[data-testid="stSidebarNavLink"][aria-current=
 .agent-title {{ font-weight:700; color: var(--navy); font-size:1.02rem; }}
 .agent-ar {{ direction: rtl; text-align: right; font-family:'IBM Plex Sans Arabic', Tahoma, sans-serif; color: var(--ink2); font-size: 0.95rem; }}
 .agent-ar.small-ar {{ font-size: 0.85rem; text-align: left; direction: rtl; unicode-bidi: plaintext; }}
+/* Per-agent frames: everything an agent produced sits inside its own coloured frame */
+[class*="st-key-frame_Agent1"] {{ --agent: #2A78D6; --agent-bg: #F3F8FE; }}
+[class*="st-key-frame_Agent2"] {{ --agent: #C97E00; --agent-bg: #FFF9EE; }}
+[class*="st-key-frame_Agent3"] {{ --agent: #0F7A51; --agent-bg: #F1F9F4; }}
+[class*="st-key-frame_Agent"] {{ border: 3px solid var(--agent) !important; border-radius: 18px !important;
+                                background: var(--agent-bg) !important; padding: 14px 16px 6px 16px !important; }}
+[class*="st-key-frame_Agent"] .issue,
+[class*="st-key-frame_Agent"] .card,
+[class*="st-key-frame_Agent"] .decision,
+[class*="st-key-frame_Agent"] .ticket {{ border-top: 2px solid var(--agent) !important; border-right: 2px solid var(--agent) !important;
+                                        border-bottom: 2px solid var(--agent) !important; }}
+[class*="st-key-frame_Agent"] .card:not([style*="border-left"]),
+[class*="st-key-frame_Agent"] .decision,
+[class*="st-key-frame_Agent"] .ticket {{ border-left: 2px solid var(--agent) !important; }}
+[class*="st-key-frame_Agent"] .ticket .th {{ background: var(--agent) !important; }}
 /* Messages timeline */
 .msg {{ display:flex; gap: 12px; margin-bottom: 10px; }}
 .msg .dot {{ width: 36px; height: 36px; font-size: 1.05rem; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:#fff;

@@ -45,8 +45,8 @@ def render_result(state: WorkflowState, llm, key: str) -> None:
     pr = a2.overall_priority.value if a2.overall_priority else None
     prov = a2.verification_status.value == "INSUFFICIENT_EVIDENCE"
     c1, c2 = st.columns([3, 2])
-    with c1:
-        C.md(f'<div class="decision"><div class="small">FINAL OPERATIONAL DECISION (Agent 3)</div>'
+    with c1, st.container(key=f"frame_Agent3_top_{key}"):
+        C.md(f'<div class="decision"><div class="small">🎫 FINAL OPERATIONAL DECISION · Resolution Agent (Agent 3)</div>'
              f'<div class="act">{C.esc(a3.action.value)}</div>'
              f'<div style="margin-top:8px">{C.severity_badge(sev, prov)} {C.priority_badge(pr)} '
              f'{C.pill("Escalation: " + a3.escalation.status.value, "warn" if a3.escalation.status.value != "NOT_ELIGIBLE" and a3.escalation.status.value != "NOT_APPLICABLE" else "muted")} '
@@ -79,11 +79,11 @@ def render_result(state: WorkflowState, llm, key: str) -> None:
     t1, t2, t3, t4, t5, t6 = st.tabs(["🔍 Agent 1 · Investigation Agent", "⚖️ Agent 2 · Impact Agent", "🎫 Agent 3 · Resolution Agent",
                                        "💬 Communication", "🧾 Audit trail", "⬇️ Export"],
                                       key=f"tabs_{key}", on_change="rerun")  # remember the open tab across reruns
-    with t1:
+    with t1, st.container(key=f"frame_Agent1_{key}"):
         _agent1_panel(state, llm)
-    with t2:
+    with t2, st.container(key=f"frame_Agent2_{key}"):
         _agent2_panel(state, llm)
-    with t3:
+    with t3, st.container(key=f"frame_Agent3_{key}"):
         _agent3_panel(state, llm)
     with t4:
         req = sum(1 for m in state.messages if m.message_type == "REVIEW_REQUEST")

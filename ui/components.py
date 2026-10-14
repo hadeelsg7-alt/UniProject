@@ -171,7 +171,7 @@ def agents_overview(compact: bool = False) -> None:
     cards = []
     for key, a in AGENTS.items():
         role = "" if compact else f'<div class="small" style="margin-top:6px">{esc(a["role"])}</div>'
-        cards.append(f'<div class="agent-card" style="border-top-color:{a["color"]}"><div class="agent-tag" style="background:{a["color"]}">'
+        cards.append(f'<div class="agent-card" style="border:3px solid {a["color"]};border-top-width:6px"><div class="agent-tag" style="background:{a["color"]}">'
                      f'AGENT {a["num"]}</div><div class="agent-title">{a["icon"]} {esc(a["full"])}</div>'
                      f'<div class="agent-ar">{esc(a["ar"])}</div>{role}</div>')
     md('<div class="agent-row">' + '<div class="agent-arrow">➜</div>'.join(cards) + "</div>")
@@ -242,7 +242,7 @@ def workflow_diagram(state, step: Optional[int] = None, live_node: Optional[str]
         if live_node is not None and s == "active":
             out = "Working on it now…"
         a = AGENTS[agent_name]
-        return (f'<div class="wf-node {s}" style="border-top:5px solid {a["color"]}"><div class="st">{st_lbl[s]}</div>'
+        return (f'<div class="wf-node {s}" style="border:3px solid {a["color"]};border-top-width:6px"><div class="st">{st_lbl[s]}</div>'
                 f'<div class="agent-tag" style="background:{a["color"]}">AGENT {a["num"]}</div>'
                 f'<div class="t">{a["icon"]} {esc(a["name"])}</div><div class="agent-ar small-ar">{esc(a["ar"])}</div>'
                 f'<div class="o" style="margin-top:6px">{out}</div>{badge(agent_name)}</div>')
@@ -350,7 +350,7 @@ def message_timeline(messages) -> None:
         extra = (pill(m.concern_code, "outline") if m.concern_code else "") + "".join(pill(i, "muted") for i in m.issue_ids)
         rnd = f" &middot; round {m.round}" if m.round else ""
         rows.append(f'<div class="msg {cls}"><div class="dot" style="background:{color}">{dot}</div>'
-                    f'<div class="body"><div class="meta"><b>{esc(agent_name(m.sender))}</b> → <b>{esc(agent_name(m.receiver))}</b>{rnd} {pill(m.message_type, kind)} {extra}</div>'
+                    f'<div class="body" style="border:2px solid {color};border-left-width:6px"><div class="meta"><b>{esc(agent_name(m.sender))}</b> → <b>{esc(agent_name(m.receiver))}</b>{rnd} {pill(m.message_type, kind)} {extra}</div>'
                     f'<div>{esc(m.content)}</div></div></div>')
     md("".join(rows))
 

@@ -115,10 +115,63 @@ def prf_bars(table: pd.DataFrame) -> alt.Chart:
     base = alt.Chart(long).encode(
         y=alt.Y("label:N", title=None, axis=alt.Axis(labelLimit=260, labelOverlap=False)),
         yOffset=alt.YOffset("metric:N", sort=domain),
-        x=alt.X("score:Q", title="Score", scale=alt.Scale(domain=[0, 1.08]), axis=alt.Axis(format=".1f")),
+        x=alt.X("score:Q", title="Score", scale=alt.Scale(domain=[0, 1.08]), axis=alt.Axis(format=".1f", values=[0, 0.2, 0.4, 0.6, 0.8, 1.0])),
         tooltip=[alt.Tooltip("label:N", title="Class"), alt.Tooltip("metric:N", title="Metric"),
                  alt.Tooltip("score:Q", title="Score", format=".3f"), alt.Tooltip("support:Q", title="Support")])
     bars = base.mark_bar(cornerRadiusEnd=4, height={"band": 0.9}).encode(
         color=alt.Color("metric:N", scale=alt.Scale(domain=domain, range=[T.METRIC_COLORS[m] for m in domain]), title="Metric"))
     labels = base.mark_text(align="left", dx=3, fontSize=11, color=T.INK_2).encode(text=alt.Text("score:Q", format=".2f"))
-    return _style(bars + labels, max(160, 60 * d["label"].nunique()))
+    return _style(bars + labels, max(180, 72 * d["label"].nunique() + 40))
+
+
+def confusion_heatmap(conf: pd.DataFrame, color: str, order: list[str] | None = None) -> alt.Chart:
+    """Reference (rows) x predicted (columns) counts; single-hue sequential scale, counts printed in each cell."""
+    labels = order or sorted(set(conf["reference"]) | set(conf["predicted"]))
+    labels = [x for x in labels if x in set(conf["reference"]) | set(conf["predicted"])]
+    labels += sorted((set(conf["predicted"]) | set(conf["reference"])) - set(labels))
+    full = pd.MultiIndex.from_product([labels, labels], names=["reference", "predicted"])
+    d = conf.set_index(["reference", "predicted"]).reindex(full, fill_value=0).reset_index()
+    d["diag"] = d["reference"] == d["predicted"]
+    base = alt.Chart(d).encode(
+        x=alt.X("predicted:N", sort=labels, title="Predicted", axis=alt.Axis(labelAngle=-30, labelOverlap=False, labelLimit=160)),
+        y=alt.Y("reference:N", sort=labels, title="Reference label", axis=alt.Axis(labelOverlap=False, labelLimit=160)),
+        tooltip=[alt.Tooltip("reference:N", title="Reference"), alt.Tooltip("predicted:N", title="Predicted"),
+                 alt.Tooltip("count:Q", title="Reviews")])
+    rect = base.mark_rect(stroke="#FFFFFF", strokeWidth=2, cornerRadius=3).encode(
+        color=alt.Color("count:Q", scale=alt.Scale(range=["#F4F7F5", color]), legend=None))
+    text = base.mark_text(fontSize=12, fontWeight=600).encode(
+        text=alt.Text("count:Q"),
+        color=alt.condition(alt.datum.count > d["count"].max() / 2, alt.value("#FFFFFF"), alt.value(T.INK)))
+    return _style(rect + text, max(170, 38 * len(labels) + 60))
+
+
+def system_metric_bars(df: pd.DataFrame, value: str, title: str, colors: dict[str, str], fmt: str = ".3f",
+                       domain_max: float | None = None) -> alt.Chart:
+    """One bar per system (rows: system_key, system, <value>); validated categorical system colours + value labels."""
+    d = df[["system_key", "system", value]].dropna(subset=[value])
+    keys = d["system_key"].tolist()
+    base = alt.Chart(d).encode(
+        y=alt.Y("system:N", title=None, sort=d["system"].tolist(), axis=alt.Axis(labelLimit=220, labelOverlap=False)),
+        x=alt.X(f"{value}:Q", title=title, scale=alt.Scale(domain=[0, domain_max or float(d[value].max() or 1) * 1.3])),
+        tooltip=[alt.Tooltip("system:N", title="System"), alt.Tooltip(f"{value}:Q", title=title, format=fmt)])
+    bars = base.mark_bar(cornerRadiusEnd=4, height={"band": 0.6}).encode(
+        color=alt.Color("system_key:N", scale=alt.Scale(domain=keys, range=[colors[k] for k in keys]), legend=None))
+    labels = base.mark_text(align="left", dx=4, color=T.INK_2, fontSize=12).encode(text=alt.Text(f"{value}:Q", format=fmt))
+    return _style(bars + labels, 46 * max(len(d), 1) + 40)
+
+
+def system_grouped_f1(long: pd.DataFrame, colors: dict[str, str]) -> alt.Chart:
+    """Macro F1 per label field, one bar per system (long: field, system_key, system, f1)."""
+    keys = list(dict.fromkeys(long["system_key"]))
+    names = list(dict.fromkeys(long["system"]))
+    base = alt.Chart(long).encode(
+        y=alt.Y("field:N", title=None, sort=list(dict.fromkeys(long["field"])), axis=alt.Axis(labelLimit=220, labelOverlap=False)),
+        yOffset=alt.YOffset("system:N", sort=names),
+        x=alt.X("f1:Q", title="Macro F1", scale=alt.Scale(domain=[0, 1.08]), axis=alt.Axis(format=".1f", values=[0, 0.2, 0.4, 0.6, 0.8, 1.0])),
+        tooltip=[alt.Tooltip("field:N", title="Field"), alt.Tooltip("system:N", title="System"),
+                 alt.Tooltip("f1:Q", title="Macro F1", format=".3f")])
+    bars = base.mark_bar(cornerRadiusEnd=4, height={"band": 0.9}).encode(
+        color=alt.Color("system:N", scale=alt.Scale(domain=names, range=[colors[k] for k in keys]), title="System",
+                        legend=alt.Legend(orient="top", direction="vertical")))
+    labels = base.mark_text(align="left", dx=3, fontSize=11, color=T.INK_2).encode(text=alt.Text("f1:Q", format=".2f"))
+    return _style(bars + labels, max(180, 22 * len(long) + 60))

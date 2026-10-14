@@ -146,6 +146,9 @@ to exist verbatim in the dataset (✅ on the Test scenarios page).
 | `data_loader.py` | CSV loading: column detection, UTF-8, missing values, duplicates |
 | `scenarios.py`, `run_scenarios.py` | Scenario definitions and the command-line runner and report |
 | `evaluation.py` | Behavioural checks and optional P/R/F1 |
+| `evaluation_suite.py` | Evaluation Dashboard metrics: label normalisation, annotation sheet, per-agent P/R/Macro F1, ticket & escalation F1, JSON validity, time and estimated cost |
+| `baselines.py` | Comparison baselines: Single LLM and Sequential LLM pipeline (same knowledge, no tools / verification / loop) |
+| `ui/eval_dashboard.py` | The Evaluation Dashboard page |
 | `knowledge_base/*.json` | EGSQUAL dimensions, dialect glossary, severity/priority rules, escalation rules, synthetic complaint history |
 | `tests/` | Unit, agent, workflow, scenario and LLM-path tests |
 
@@ -224,9 +227,21 @@ You can change all thresholds in `knowledge_base/*.json` without touching the co
   - that the loop stayed within its bound.
 
   These are **rule-compliance checks, not accuracy scores**.
-- **Precision / Recall / F1** are computed **only** when you upload a CSV of **verified reference labels**
-  (`review_id` plus any of `feedback_type`, `severity`, `priority`, `action`, `escalation_status`, `dimensions`) in
-  the Evaluation page. The dataset has no such labels, so no accuracy figures are claimed.
+- **Evaluation Dashboard** (`evaluation_suite.py`, `baselines.py`, *Evaluation Dashboard* page) implements the evaluation plan.
+  All metrics are computed **only** from human-verified reference labels that you upload. The dataset has no labels, so no
+  accuracy figures are claimed.
+  1. Export a stratified annotation sheet (blank label columns) and the guidelines. Label it, then upload it.
+     The columns are `review_id`, plus optional `text`, and any of `feedback_type`, `dimensions`, `sentiment`, `severity`,
+     `priority`, `action`, `ticket` and `escalation`.
+  2. The dashboard reports these metrics:
+     - **Agent 1:** feedback type and EGSQUAL service domain, with P, R and Macro F1.
+     - **Agent 2:** sentiment, severity and priority, with P, R and Macro F1. The star rating is shown only as a supporting
+       indicator for sentiment.
+     - **Agent 3:** ticket and escalation decisions, with P, R and F1, plus the JSON ticket validity rate.
+     - **Overall:** Multi-Agent vs Single LLM vs Sequential LLM pipeline on the same set. It shows Macro F1, Escalation F1,
+       processing time per review, and estimated cost.
+  3. Baselines need a working LLM. If they cannot run, they are recorded as failed and never simulated. Cost is an
+     estimate: tokens counted from API responses × `ANTHROPIC_PRICE_*` / `OPENAI_PRICE_*` from `.env`.
 
 ---
 
@@ -300,7 +315,8 @@ Launch with `streamlit run app.py` and open <http://localhost:8501>.
 | **Analyse feedback** | Type a review (or load a researcher-written example), pick one from the dataset, or upload a CSV. The pipeline shows the active agent live. The result shows the decision summary, a workflow diagram with a revision counter, **step-by-step replay** of the real trace, and tabs for each agent, communication, audit trail and export. |
 | **Test scenarios** | S1–S8 cards. **S6** shows a real Agent 2 → Agent 1 revision; **S8** (synthetic) shows an escalation candidate awaiting human approval. |
 | **Batch analysis** | Filters, KPIs, charts, a results table, CSV/JSON export and drill-down into any result. |
-| **Evaluation** | Behavioural checks (pass/fail chart). Precision, Recall and Macro F1 appear only after uploading **verified** reference labels; a label template is provided. |
+| **Evaluation** | Behavioural checks on the scenarios (pass/fail chart). |
+| **Evaluation Dashboard** | Annotation sheet export, then label upload. It shows per-agent P/R/Macro F1 (framed per agent) with confusion matrices, ticket/escalation F1 and JSON validity, and the Multi-Agent vs Single LLM vs Sequential pipeline comparison (Macro F1, Escalation F1, time, estimated cost). |
 | **Methodology & rules** | EGSQUAL definitions, the R1–R4 / P-rules and the E1–E5 escalation rules. |
 
 The step replay and live view are driven by the workflow's own callbacks and trace (`node_log_index`,

@@ -16,6 +16,7 @@ import config
 from data_loader import load_reviews
 from llm import LLMClient
 from ui import pages as P
+from ui.eval_dashboard import page_eval_dashboard
 from ui.theme import inject_css
 from workflow import MultiAgentWorkflow
 
@@ -78,6 +79,7 @@ nav = st.navigation([
     st.Page(P.page_scenarios, title="Test scenarios", icon=":material/science:", url_path="scenarios"),
     st.Page(P.page_batch, title="Batch analysis", icon=":material/stacks:", url_path="batch"),
     st.Page(P.page_evaluation, title="Evaluation", icon=":material/fact_check:", url_path="evaluation"),
+    st.Page(page_eval_dashboard, title="Evaluation Dashboard", icon=":material/monitoring:", url_path="evaluation-dashboard"),
     st.Page(P.page_methodology, title="Methodology & rules", icon=":material/menu_book:", url_path="methodology"),
 ], position="sidebar")
 nav.run()

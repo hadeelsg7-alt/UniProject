@@ -36,6 +36,10 @@ class LLMClient:
         self.model = ""
         self.note = ""
         self._client = None
+        # token accounting (used to estimate cost in the evaluation dashboard)
+        self.input_tokens = 0
+        self.output_tokens = 0
+        self.successful_calls = 0
 
         if requested == "anthropic":
             if not config.ANTHROPIC_API_KEY:
@@ -117,10 +121,31 @@ class LLMClient:
             raise _NonRetryable("The model declined this request (stop_reason=refusal)")
         if resp.stop_reason == "max_tokens":
             raise LLMError("Output truncated (max_tokens) - increase LLM_MAX_TOKENS")
+        self._record_usage(getattr(resp, "usage", None))
         parsed = resp.parsed_output
         if parsed is None:
             raise LLMError("No parsed output returned")
         return parsed
+
+    def _record_usage(self, usage) -> None:
+        if usage is None:
+            return
+        self.input_tokens += int(getattr(usage, "input_tokens", 0) or 0)
+        self.output_tokens += int(getattr(usage, "output_tokens", 0) or 0)
+        self.successful_calls += 1
+
+    def usage_snapshot(self) -> tuple[int, int, int]:
+        return self.input_tokens, self.output_tokens, self.successful_calls
+
+    def price_per_mtok(self) -> tuple[Optional[float], Optional[float]]:
+        """Configured (input, output) USD price per million tokens for the active provider, or (None, None)."""
+        if self.provider == "anthropic":
+            return config.ANTHROPIC_PRICE_INPUT, config.ANTHROPIC_PRICE_OUTPUT
+        if self.provider == "openai":
+            return config.OPENAI_PRICE_INPUT, config.OPENAI_PRICE_OUTPUT
+        if self.provider == "stub":
+            return getattr(self, "stub_prices", (None, None))
+        return None, None
 
     def _openai(self, system: str, user: str, schema: Type[T]) -> T:
         import openai
@@ -133,6 +158,7 @@ class LLMClient:
         except (openai.AuthenticationError, openai.PermissionDeniedError,
                 openai.NotFoundError, openai.BadRequestError) as e:
             raise _NonRetryable(f"{type(e).__name__}: {e}") from e
+        self._record_usage(getattr(resp, "usage", None))
         parsed = resp.output_parsed
         if parsed is None:
             raise LLMError("No parsed output returned")
@@ -147,14 +173,20 @@ class StubLLM(LLMClient):
     """Test double that returns pre-programmed structured outputs (no network).
     Used in tests to exercise the LLM code path of every agent."""
 
-    def __init__(self, responses: dict[str, list[BaseModel]] | None = None):
+    def __init__(self, responses: dict[str, list[BaseModel]] | None = None,
+                 usage_per_call: tuple[int, int] = (0, 0), prices: tuple = (None, None)):
         super().__init__(provider="offline")
         self.provider, self.model = "stub", "stub-model"
         self.responses = responses or {}
         self.calls: list[tuple[str, str]] = []
+        self.usage_per_call = usage_per_call
+        self.stub_prices = prices
 
     def structured(self, system: str, user: str, schema: Type[T]) -> T:
         self.calls.append((schema.__name__, user[:80]))
+        self.input_tokens += self.usage_per_call[0]
+        self.output_tokens += self.usage_per_call[1]
+        self.successful_calls += 1
         queue = self.responses.get(schema.__name__, [])
         if not queue:
             raise LLMError(f"StubLLM has no response queued for {schema.__name__}")

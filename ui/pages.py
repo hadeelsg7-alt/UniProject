@@ -3,7 +3,6 @@ st.session_state["ctx"] by app.py. Results of every run are kept in a session
 store so the overview dashboard reflects only analyses that really ran."""
 from __future__ import annotations
 
-import io
 import json
 from dataclasses import dataclass
 from datetime import date
@@ -372,9 +371,6 @@ def page_batch() -> None:
 # =========================================================================== #
 # 5. Evaluation
 # =========================================================================== #
-LABEL_COLUMNS = ["feedback_type", "severity", "priority", "action", "escalation_status", "dimensions"]
-
-
 def page_evaluation() -> None:
     c = ctx()
     C.hero("Evaluation", "Rule-compliance checks on the test scenarios, and Precision / Recall / F1 only against verified reference labels.",
@@ -410,61 +406,11 @@ def page_evaluation() -> None:
             view = chk if (not only or only == "All") else chk[chk["result"] == only]
             st.dataframe(view, hide_index=True, width="stretch", height=360)
 
-    C.section("2 · Precision / Recall / F1", "computed only from verified reference labels you upload")
-    st.markdown("Upload a CSV with a `review_id` column (e.g. `R00705`) and any of these label columns: "
-                + ", ".join(f"`{x}`" for x in LABEL_COLUMNS) + ". `dimensions` is semicolon-separated. Labels must be "
-                "**verified by a human annotator**; the dataset itself contains none.")
-    tmpl = pd.DataFrame({"review_id": ["R00705", "R02464"], **{col: ["", ""] for col in LABEL_COLUMNS}})
-    st.download_button("⬇️ Label template (CSV)", tmpl.to_csv(index=False).encode("utf-8-sig"), "reference_labels_template.csv", "text/csv")
-    up = st.file_uploader("Reference labels CSV", type=["csv"], key="ev_labels")
-    if up is None:
-        C.empty_state("🔒", "No reference labels → no performance metrics", "Precision, Recall and F1 are never estimated or "
-                      "simulated. Upload verified labels to compute them.")
-        return
-    try:
-        ref = pd.read_csv(io.BytesIO(up.getvalue()), encoding="utf-8-sig", dtype=str)
-    except Exception as e:  # noqa: BLE001
-        st.error(f"Could not read the CSV: {e}")
-        return
-    if "review_id" not in ref.columns:
-        st.error("The file needs a `review_id` column.")
-        return
-    analysed = {s.review.review_id: s for s in store().values()}
-    missing = [rid for rid in ref["review_id"].astype(str) if rid not in analysed]
-    if missing:
-        can = c.df is not None and c.df["review_id"].isin(missing).any()
-        absent = [rid for rid in missing if c.df is None or rid not in set(c.df["review_id"])]
-        st.info(f"{len(missing)} labelled review(s) have not been analysed in this session yet."
-                + (f" {len(absent)} of them are not in the loaded dataset (unknown id, or removed as a duplicate of an "
-                   f"earlier review from the same app): {', '.join(absent[:10])}." if absent else ""))
-        if can and st.button(f"▶ Run the agents on the {int(c.df['review_id'].isin(missing).sum())} labelled review(s)", type="primary"):
-            todo = c.df[c.df["review_id"].isin(missing)]
-            remember(run_batch_with_progress([row_to_review(r) for _, r in todo.iterrows()], "Labelled reviews"), "labelled")
-            st.rerun()
-    states = list({s.review.review_id: s for s in store().values()}.values())
-    try:
-        res = evaluation.prf_from_reference(ref, states)
-    except ValueError as e:
-        st.error(str(e))
-        return
-    if not res:
-        C.empty_state("⚠️", "Nothing to score", "No overlap between the labelled review_ids / label columns and the analysed results.")
-        return
-    for field, table in res.items():
-        with st.container(border=True):
-            st.markdown(f"**{field}** · {int(table['support'].iloc[-1])} labelled item(s)")
-            body = table[~table["label"].isin(["MACRO AVG", "ACCURACY", "MICRO AVG"])]
-            macro_f1 = body["f1"].mean() if not body.empty else 0.0
-            kp = [("Macro F1", f"{macro_f1:.3f}", "mean over classes"),
-                  ("Macro precision", f"{body['precision'].mean():.3f}", ""),
-                  ("Macro recall", f"{body['recall'].mean():.3f}", "")]
-            if (table["label"] == "ACCURACY").any():
-                kp.append(("Accuracy", f"{float(table.loc[table['label'] == 'ACCURACY', 'f1'].iloc[0]):.3f}", "exact match", "navy"))
-            if (table["label"] == "MICRO AVG").any():
-                kp.append(("Micro F1", f"{float(table.loc[table['label'] == 'MICRO AVG', 'f1'].iloc[0]):.3f}", "multi-label", "navy"))
-            C.kpi_row(kp)
-            st.altair_chart(CH.prf_bars(table), width="stretch")
-            st.dataframe(table, hide_index=True, width="stretch")
+    C.section("2 · Precision / Recall / F1 and system comparison", "against verified reference labels")
+    C.md('<div class="card"><h4>📊 Evaluation Dashboard</h4><div class="small">Per-agent Precision / Recall / Macro F1, '
+         'ticket JSON validity, and Multi-Agent vs Single LLM vs Sequential LLM pipeline (Macro F1, Escalation F1, '
+         'processing time, estimated cost) are on the <b>Evaluation Dashboard</b> page in the sidebar. They are computed only '
+         'from human-verified labels you upload there.</div></div>')
 
 
 # =========================================================================== #

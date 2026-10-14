@@ -37,6 +37,20 @@ ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-5-5")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "")  # set to a model your account supports
 
+def _price(name: str, default: str) -> float | None:
+    v = os.getenv(name, default).strip()
+    return float(v) if v else None
+
+
+# Prices in USD per million tokens, used ONLY to estimate cost in the evaluation
+# dashboard (tokens are counted from the API responses). Defaults are the
+# published Claude Opus 5.5 list prices at the time of writing - verify them on
+# the provider's pricing page and override in .env if they differ.
+ANTHROPIC_PRICE_INPUT = _price("ANTHROPIC_PRICE_INPUT", "4.0")
+ANTHROPIC_PRICE_OUTPUT = _price("ANTHROPIC_PRICE_OUTPUT", "20.0")
+OPENAI_PRICE_INPUT = _price("OPENAI_PRICE_INPUT", "")    # set for your OpenAI model
+OPENAI_PRICE_OUTPUT = _price("OPENAI_PRICE_OUTPUT", "")
+
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "8000"))
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))  # our own retry loop
 LLM_RETRY_BASE_DELAY = float(os.getenv("LLM_RETRY_BASE_DELAY", "2.0"))  # seconds

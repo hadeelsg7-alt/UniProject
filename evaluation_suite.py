@@ -20,6 +20,7 @@ Costs are ESTIMATES (tokens counted from the API responses x configured prices).
 """
 from __future__ import annotations
 
+import io
 import json
 import time
 from dataclasses import asdict, dataclass, field
@@ -234,6 +235,126 @@ def annotation_guidelines() -> str:
               "yes only if the beneficiary already complained to the provider, the complaint is unresolved, the response deadline passed,",
               "and the issue is High or Critical. Escalation is simulated and always needs human approval."]
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------- #
+# Review workbook (human verification of drafted labels)
+# --------------------------------------------------------------------------- #
+UNREVIEWED = "AI-drafted (not reviewed)"
+VERIFIED = "human-verified"
+_DROPDOWNS = {"feedback_type": FEEDBACK_TYPES, "sentiment": SENTIMENTS, "severity": SEVERITIES, "priority": PRIORITIES,
+              "action": ACTIONS, "ticket": YES_NO, "escalation": YES_NO, "label_source": [UNREVIEWED, VERIFIED]}
+
+
+def build_review_workbook(labels: pd.DataFrame, rationale: dict[str, str] | None = None) -> bytes:
+    """Excel workbook for verifying drafted labels: 'Labels' (editable, dropdowns), 'Guide', and a locked
+    'AI_original' copy so the dashboard can report how many labels the human reviewer changed."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    rationale = rationale or {}
+    cols = ["review_id", "app_id", "rating", "text", *LABEL_COLUMNS, "label_source", "ai_rationale", "reviewer_notes"]
+    df = labels.copy()
+    for c in cols:
+        if c not in df.columns:
+            df[c] = ""
+    df["label_source"] = UNREVIEWED
+    df["ai_rationale"] = df["review_id"].map(lambda r: rationale.get(str(r), ""))
+    df = df[cols].fillna("")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Labels"
+    ws.append(cols)
+    for row in df.itertuples(index=False):
+        ws.append([str(v) if v is not None else "" for v in row])
+    head = PatternFill("solid", fgColor="0E3B2C")
+    edit = PatternFill("solid", fgColor="FFF7E0")
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = head
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    widths = {"review_id": 10, "app_id": 14, "rating": 7, "text": 60, "dimensions": 26, "action": 22,
+              "label_source": 24, "ai_rationale": 55, "reviewer_notes": 30}
+    n = len(df) + 1
+    for i, c in enumerate(cols, start=1):
+        letter = ws.cell(row=1, column=i).column_letter
+        ws.column_dimensions[letter].width = widths.get(c, 15)
+        for r in range(2, n + 1):
+            cell = ws.cell(row=r, column=i)
+            cell.alignment = Alignment(wrap_text=c in ("text", "ai_rationale", "reviewer_notes"), vertical="top",
+                                       horizontal="right" if c in ("text", "ai_rationale") else "left",
+                                       readingOrder=2 if c in ("text", "ai_rationale") else 0)
+            if c in LABEL_COLUMNS or c == "label_source":
+                cell.fill = edit
+        if c in _DROPDOWNS:
+            dv = DataValidation(type="list", formula1='"' + ",".join(_DROPDOWNS[c]) + '"', allow_blank=True)
+            dv.add(f"{letter}2:{letter}{n}")
+            ws.add_data_validation(dv)
+        if c == "dimensions":
+            dv = DataValidation(type="custom", formula1="TRUE", allow_blank=True, showInputMessage=True,
+                                promptTitle="EGSQUAL", prompt="Keys separated by ; or NONE: " + ", ".join(tools.egsqual_kb()))
+            dv.add(f"{letter}2:{letter}{n}")
+            ws.add_data_validation(dv)
+    ws.freeze_panes = "E2"
+    ws.auto_filter.ref = ws.dimensions
+
+    g = wb.create_sheet("Guide")
+    g.sheet_view.rightToLeft = True
+    g.column_dimensions["A"].width = 120
+    lines = ["طريقة المراجعة",
+             "1. اقرئي النص العربي (عمود text) وقارنيه بالتصنيفات في الخلايا الصفراء.",
+             "2. إذا التصنيف صحيح اتركيه. إذا غلط اختاري القيمة الصحيحة من القائمة المنسدلة.",
+             "3. عمود ai_rationale يشرح سبب تصنيف الذكاء الاصطناعي، استخدميه للمراجعة السريعة بس لا تعتمدين عليه.",
+             "4. بعد ما تراجعين الصف كامل غيّري label_source إلى human-verified.",
+             "5. إذا ما قدرتي تقررين، امسحي الخلية (تُستبعد من الحساب) واكتبي السبب في reviewer_notes.",
+             "6. احفظي الملف بصيغة xlsx وارفعيه في Evaluation Dashboard. لا تعدلين ورقة AI_original.", ""]
+    lines += [ln for ln in annotation_guidelines().splitlines()]
+    for ln in lines:
+        g.append([ln])
+        g.cell(row=g.max_row, column=1).alignment = Alignment(wrap_text=True, horizontal="right" if not ln.isascii() else "left")
+    g["A1"].font = Font(bold=True, size=14)
+
+    o = wb.create_sheet("AI_original")
+    o.append(["review_id", *LABEL_COLUMNS])
+    for row in df[["review_id", *LABEL_COLUMNS]].itertuples(index=False):
+        o.append(list(row))
+    o.protection.sheet = True
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def read_labels_file(data: bytes, filename: str) -> tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+    """Read a labels CSV or review workbook. Returns (labels, AI_original or None)."""
+    if filename.lower().endswith((".xlsx", ".xlsm")):
+        sheets = pd.read_excel(io.BytesIO(data), sheet_name=None, dtype=str, keep_default_na=False, na_values=[""])
+        ref = sheets.get("Labels", next(iter(sheets.values())))
+        return ref, sheets.get("AI_original")
+    return pd.read_csv(io.BytesIO(data), encoding="utf-8-sig", dtype=str, keep_default_na=False, na_values=[""]), None
+
+
+def review_status(ref: pd.DataFrame) -> dict:
+    """How many rows a human has marked as verified (label_source column)."""
+    if "label_source" not in ref.columns:
+        return {"tracked": False, "rows": len(ref), "verified": None, "unreviewed": None}
+    src = ref["label_source"].fillna("").astype(str).str.strip().str.lower()
+    verified = int((src == VERIFIED).sum())
+    return {"tracked": True, "rows": len(ref), "verified": verified, "unreviewed": len(ref) - verified}
+
+
+def label_changes(ref: pd.DataFrame, original: pd.DataFrame) -> pd.DataFrame:
+    """Per field: how many drafted labels the human reviewer changed (compared after normalisation)."""
+    cur, _ = normalise_reference(ref)
+    orig, _ = normalise_reference(original)
+    rows = []
+    for f in LABEL_COLUMNS:
+        ids = [rid for rid in orig if f in orig[rid]]
+        changed = sum(1 for rid in ids if cur.get(rid, {}).get(f) != orig[rid][f])
+        rows.append({"field": f, "drafted": len(ids), "changed_by_reviewer": changed,
+                     "changed_%": round(100 * changed / len(ids), 1) if ids else None})
+    return pd.DataFrame(rows)
 
 
 # --------------------------------------------------------------------------- #

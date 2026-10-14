@@ -154,3 +154,38 @@ def test_baseline_failures_are_recorded_not_faked():
     assert q.failed and "offline" in q.error
     m = E.agent1_metrics({"T1": {"feedback_type": "Bug"}}, [p])["feedback_type"]
     assert m["accuracy"] == 0.0 and m["macro_f1"] == 0.0
+
+
+# ---------------------------------------------------------------- human review of drafted labels
+def test_none_label_survives_csv_reading():
+    csv = "review_id,severity,priority\nT1,None,None\nT2,High,\n".encode("utf-8-sig")
+    ref, orig = E.read_labels_file(csv, "labels.csv")
+    labels, _ = E.normalise_reference(ref)
+    assert orig is None and labels["T1"] == {"severity": "None", "priority": "None"} and labels["T2"] == {"severity": "High"}
+
+
+def test_review_workbook_roundtrip_tracks_human_changes():
+    import io
+
+    from openpyxl import load_workbook
+
+    draft = pd.DataFrame({"review_id": ["T1", "T2"], "text": ["أ", "ب"], "severity": ["None", "Low"], "ticket": ["no", "yes"]})
+    data = E.build_review_workbook(draft, {"T1": "سبب"})
+    ref, orig = E.read_labels_file(data, "review.xlsx")
+    assert E.review_status(ref) == {"tracked": True, "rows": 2, "verified": 0, "unreviewed": 2}
+    assert ref.loc[0, "ai_rationale"] == "سبب" and ref.loc[0, "severity"] == "None"
+    assert E.label_changes(ref, orig)["changed_by_reviewer"].sum() == 0
+
+    wb = load_workbook(io.BytesIO(data))
+    ws = wb["Labels"]
+    hdr = [c.value for c in ws[1]]
+    ws.cell(row=3, column=hdr.index("severity") + 1).value = "Medium"
+    for r in (2, 3):
+        ws.cell(row=r, column=hdr.index("label_source") + 1).value = E.VERIFIED
+    buf = io.BytesIO()
+    wb.save(buf)
+    ref, orig = E.read_labels_file(buf.getvalue(), "review.xlsx")
+    assert E.review_status(ref)["unreviewed"] == 0
+    ch = E.label_changes(ref, orig).set_index("field")
+    assert ch.loc["severity", "changed_by_reviewer"] == 1 and ch.loc["ticket", "changed_by_reviewer"] == 0
+    assert "Guide" in wb.sheetnames and wb["AI_original"].protection.sheet

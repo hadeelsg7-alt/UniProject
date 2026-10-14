@@ -14,4 +14,13 @@ Before you report any result:
 2. Ideally a second annotator labels the same rows independently, and disagreements are resolved.
 3. Replace `label_source` with, for example, `human-verified`.
 
-Upload the file on the **Evaluation Dashboard** page.
+## Reviewing the labels (recommended)
+
+Open `review_labels_50.xlsx` in Excel or Numbers. It has three sheets:
+- **Labels**: the AI-drafted labels in yellow cells with dropdowns, plus `ai_rationale` (why each label was chosen) and
+  `reviewer_notes`. Correct any wrong label and set `label_source` to `human-verified` for each row you have checked.
+- **Guide**: the review steps and the allowed values.
+- **AI_original**: a locked copy of the draft. The dashboard uses it to report how many labels you changed.
+
+Upload the `.xlsx` (or a CSV) on the **Evaluation Dashboard** page. It reports how many rows are still unreviewed and
+how many labels you changed, which you can cite in the methodology.

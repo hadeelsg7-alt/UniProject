@@ -6,7 +6,6 @@ and baselines that cannot run (no LLM) are reported as not run."""
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 
 import pandas as pd
@@ -71,23 +70,36 @@ def _step_labels(c):
         st.dataframe(pd.DataFrame([{"column": k, "agent": C.agent_name(v["agent"]), "values": ", ".join(v["values"] or ["EGSQUAL keys ';'"])}
                                    for k, v in E.LABEL_SPEC.items()]), hide_index=True, width="stretch", height=320)
 
-    up = st.file_uploader("Upload the labelled CSV (must contain `review_id`; optional `text`, `rating`, `app_id`)",
-                          type=["csv"], key="evd_labels")
+    up = st.file_uploader("Upload the labels: CSV, or the Excel review workbook (must contain `review_id`; optional `text`, `rating`, `app_id`)",
+                          type=["csv", "xlsx"], key="evd_labels")
     if up is None:
         C.empty_state("🔒", "No reference labels → no metrics", "Precision, Recall, F1 and the system comparison are computed "
                       "only from human-verified labels. Nothing is estimated or simulated without them.")
         return None, None
     try:
-        ref = pd.read_csv(io.BytesIO(up.getvalue()), encoding="utf-8-sig", dtype=str)
+        ref, original = E.read_labels_file(up.getvalue(), up.name)
         labels, cov = E.normalise_reference(ref)
+    except ImportError:
+        st.error("Reading Excel needs the openpyxl package: run `pip install openpyxl` in the project's .venv, or upload a CSV.")
+        return None, None
     except Exception as e:  # noqa: BLE001
         st.error(f"Could not read the labels: {e}")
         return None, None
     st.session_state["evd_fp"] = hashlib.sha1(up.getvalue()).hexdigest()[:12]
-    if "label_source" in ref.columns and ref["label_source"].fillna("").str.contains("AI", case=False).any():
-        st.warning("⚠️ These labels were **drafted by an AI (Claude)**, not verified by a human annotator. Because the "
-                   "multi-agent framework also uses Claude, scores against them are biased and must not be reported as "
-                   "human-verified results. Review and correct the labels first, then replace the `label_source` value.")
+    rs = E.review_status(ref)
+    if rs["tracked"] and rs["unreviewed"]:
+        st.warning(f"⚠️ {rs['unreviewed']} of {rs['rows']} row(s) are **not yet marked `{E.VERIFIED}`**. Those labels were "
+                   "drafted by an AI (Claude). The framework also uses Claude, so scores against unreviewed labels are biased "
+                   "and must not be reported as human-verified results.")
+    elif rs["tracked"]:
+        st.success(f"✅ All {rs['rows']} row(s) are marked `{E.VERIFIED}` by the reviewer.")
+    if original is not None:
+        ch = E.label_changes(ref, original)
+        tot_d, tot_c = int(ch["drafted"].sum()), int(ch["changed_by_reviewer"].sum())
+        with st.expander(f"Human review of the AI draft · {tot_c} of {tot_d} label(s) changed "
+                         f"({100 * tot_c / max(tot_d, 1):.1f}%)"):
+            st.dataframe(ch, hide_index=True, width="stretch")
+            st.caption("Report this in the methodology: labels were pre-annotated by an LLM and reviewed/corrected by the researcher.")
     with st.expander(f"Label coverage · {len(labels)} labelled review(s)", expanded=bool(cov['unrecognised'].sum())):
         st.dataframe(cov, hide_index=True, width="stretch")
         if cov["unrecognised"].sum():

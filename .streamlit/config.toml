@@ -1,10 +1,10 @@
 [theme]
-# Light, high-contrast theme for projector demos (navy / white / teal)
+# Light, high-contrast theme for projector demos (forest green / white / emerald)
 base = "light"
-primaryColor = "#0E8C87"
-backgroundColor = "#F4F7FA"
+primaryColor = "#0F7A51"
+backgroundColor = "#F3F8F5"
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#0B1F3A"
+textColor = "#10261D"
 font = "sans serif"
 
 [browser]

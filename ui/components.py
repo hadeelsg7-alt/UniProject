@@ -69,22 +69,22 @@ SEV_ICON = {"Low": "●", "Medium": "▲", "High": "◆", "Critical": "■"}
 
 def severity_badge(sev: Optional[str], provisional: bool = False) -> str:
     if not sev:
-        return '<span class="sev" style="background:#EEF2F6;color:#4A5B70">No severity</span>'
+        return '<span class="sev" style="background:#EDF3EF;color:#4A5E55">No severity</span>'
     return (f'<span class="sev" style="background:{T.SEVERITY_COLORS[sev]};color:{T.SEVERITY_TEXT[sev]}">'
             f'{SEV_ICON[sev]} {esc(sev)}{" (provisional)" if provisional else ""}</span>')
 
 
 def priority_badge(p: Optional[str]) -> str:
     if not p:
-        return '<span class="sev" style="background:#EEF2F6;color:#4A5B70">No priority</span>'
+        return '<span class="sev" style="background:#EDF3EF;color:#4A5E55">No priority</span>'
     return f'<span class="sev" style="background:{T.PRIORITY_COLORS[p]};color:{T.PRIORITY_TEXT[p]}">{esc(p)}</span>'
 
 
 def severity_meter(sev: Optional[str]) -> str:
     level = T.SEVERITY_ORDER.index(sev) + 1 if sev in T.SEVERITY_ORDER else 0
-    color = T.SEVERITY_COLORS.get(sev, "#E7ECF2")
+    color = T.SEVERITY_COLORS.get(sev, "#E5EEE8")
     return '<div class="meter">' + "".join(
-        f'<span style="background:{color if i < level else "#E7ECF2"}"></span>' for i in range(4)) + "</div>"
+        f'<span style="background:{color if i < level else "#E5EEE8"}"></span>' for i in range(4)) + "</div>"
 
 
 # --------------------------------------------------------------------------- #
@@ -214,7 +214,11 @@ def workflow_diagram(state, step: Optional[int] = None, live_node: Optional[str]
     snippet = esc(state.review.text.strip()[:70]) + ("…" if len(state.review.text.strip()) > 70 else "")
     out_done = "OUT" in [NODE_AGENT.get(n) for n in seen]
     out_status = "done" if out_done else "pending"
-    decision = esc(a3.final_decision[:90]) if (a3 and out_done) else "Awaiting decision"
+    if a3 and out_done:
+        sev_txt = (f"{a2.overall_severity.value} / {a2.overall_priority.value}" if a2 and a2.overall_severity else "no severity")
+        decision = f"{esc(a3.action.value)}<br><b>{esc(sev_txt)}</b>"
+    else:
+        decision = "Awaiting decision"
     arrow = lambda on: f'<div class="wf-arrow{"" if on else " dim"}">➜</div>'  # noqa: E731
 
     rounds = sum(1 for n in seen if n == "A1_REVIEW_RESPONSE")
@@ -294,7 +298,7 @@ def assessment_card(a, issue) -> None:
 # --------------------------------------------------------------------------- #
 # Inter-agent messages
 # --------------------------------------------------------------------------- #
-AGENT_COLOR = {"Agent1": "#2A78D6", "Agent2": "#C97E00", "Agent3": "#0E8C87", "Human officer": "#0B2545", "Orchestrator": "#4A5B70"}
+AGENT_COLOR = {"Agent1": "#2A78D6", "Agent2": "#C97E00", "Agent3": "#0F7A51", "Human officer": "#0E3B2C", "Orchestrator": "#4A5E55"}
 
 
 def message_timeline(messages) -> None:
@@ -304,7 +308,7 @@ def message_timeline(messages) -> None:
     rows = []
     for m in messages:
         cls = {"REVIEW_REQUEST": "req", "REVIEW_RESPONSE": "resp"}.get(m.message_type, "")
-        color = AGENT_COLOR.get(m.sender, "#4A5B70")
+        color = AGENT_COLOR.get(m.sender, "#4A5E55")
         kind = {"REVIEW_REQUEST": "bad", "REVIEW_RESPONSE": "teal", "HANDOFF": "navy"}[m.message_type]
         extra = (pill(m.concern_code, "outline") if m.concern_code else "") + "".join(pill(i, "muted") for i in m.issue_ids)
         rnd = f" &middot; round {m.round}" if m.round else ""

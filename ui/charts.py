@@ -17,8 +17,8 @@ FONT = "Inter, IBM Plex Sans Arabic, sans-serif"
 def _style(chart: alt.Chart, height: int) -> alt.Chart:
     return (chart.properties(height=height)
             .configure_view(strokeWidth=0)
-            .configure_axis(labelFont=FONT, titleFont=FONT, labelColor=T.INK_2, titleColor=T.INK_2, gridColor="#EEF2F6",
-                            domain=False, tickColor="#EEF2F6", labelFontSize=12, titleFontSize=12)
+            .configure_axis(labelFont=FONT, titleFont=FONT, labelColor=T.INK_2, titleColor=T.INK_2, gridColor="#EDF3EF",
+                            domain=False, tickColor="#EDF3EF", labelFontSize=12, titleFontSize=12)
             .configure_legend(labelFont=FONT, titleFont=FONT, labelColor=T.INK_2, titleColor=T.INK_2, orient="top")
             .configure_text(font=FONT))
 
@@ -50,7 +50,7 @@ def single_hue_bars(series: pd.Series, color: str, title: str, order: list[str] 
 def severity_bars(series: pd.Series, include_none: bool = False) -> alt.Chart:
     order = T.SEVERITY_ORDER + (["No severity"] if include_none else [])
     df = _counts(series.fillna("No severity") if include_none else series, order)
-    colors = [T.SEVERITY_COLORS[s] for s in T.SEVERITY_ORDER] + (["#C3CDD9"] if include_none else [])
+    colors = [T.SEVERITY_COLORS[s] for s in T.SEVERITY_ORDER] + (["#C2D1C8"] if include_none else [])
     base = alt.Chart(df).encode(
         y=alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelOverlap=False)),
         x=alt.X("count:Q", title="Count"),
@@ -82,7 +82,7 @@ def severity_by_rating(df: pd.DataFrame) -> alt.Chart:
     g = d.groupby(["rating", "severity"]).size().reset_index(name="count")
     g["share"] = (g["count"] / g.groupby("rating")["count"].transform("sum") * 100).round(1)
     order = T.SEVERITY_ORDER + ["No severity"]
-    colors = [T.SEVERITY_COLORS[s] for s in T.SEVERITY_ORDER] + ["#C3CDD9"]
+    colors = [T.SEVERITY_COLORS[s] for s in T.SEVERITY_ORDER] + ["#C2D1C8"]
     chart = alt.Chart(g).mark_bar(stroke="#FFFFFF", strokeWidth=2, height={"band": 0.62}).encode(
         y=alt.Y("rating:N", title="Star rating", sort=["1★", "2★", "3★", "4★", "5★"], axis=alt.Axis(labelOverlap=False)),
         x=alt.X("share:Q", stack="normalize", title="Share of reviews", axis=alt.Axis(format="%")),
@@ -96,7 +96,7 @@ def severity_by_rating(df: pd.DataFrame) -> alt.Chart:
 
 def checks_by_scenario(checks: pd.DataFrame) -> alt.Chart:
     g = checks.groupby(["scenario", "result"]).size().reset_index(name="count")
-    domain, colors = ["PASS", "FAIL", "N/A"], ["#0CA30C", "#D03B3B", "#C3CDD9"]
+    domain, colors = ["PASS", "FAIL", "N/A"], ["#0CA30C", "#D03B3B", "#C2D1C8"]
     chart = alt.Chart(g).mark_bar(stroke="#FFFFFF", strokeWidth=2, height={"band": 0.6}).encode(
         y=alt.Y("scenario:N", title=None, axis=alt.Axis(labelOverlap=False)),
         x=alt.X("count:Q", title="Behavioural checks"),

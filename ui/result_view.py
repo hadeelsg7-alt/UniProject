@@ -171,8 +171,8 @@ def _agent2_panel(state, llm) -> None:
         pos = int((score + 1) / 2 * 100)
         C.md(f'<div class="card"><h4>Sentiment (reported separately)</h4><div class="small">Tone of the text and star rating — informational only (rule S0)</div>'
              f'<div style="margin-top:10px">{C.pill(a2.sentiment_intensity, "navy")} <span class="small">score {score:+.2f}</span></div>'
-             f'<div style="position:relative;height:10px;border-radius:5px;margin-top:10px;background:linear-gradient(90deg,#D03B3B,#EEF2F6,#0CA30C)">'
-             f'<div style="position:absolute;left:calc({pos}% - 6px);top:-3px;width:12px;height:16px;border-radius:3px;background:#0B2545"></div></div>'
+             f'<div style="position:relative;height:10px;border-radius:5px;margin-top:10px;background:linear-gradient(90deg,#D03B3B,#EDF3EF,#0CA30C)">'
+             f'<div style="position:absolute;left:calc({pos}% - 6px);top:-3px;width:12px;height:16px;border-radius:3px;background:#0E3B2C"></div></div>'
              f'<div style="display:flex;justify-content:space-between" class="small"><span>negative</span><span>positive</span></div></div>')
     if a2.sentiment_vs_severity_note:
         st.info(a2.sentiment_vs_severity_note, icon="⚖️")

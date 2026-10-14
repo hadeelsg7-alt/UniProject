@@ -84,6 +84,10 @@ def _step_labels(c):
         st.error(f"Could not read the labels: {e}")
         return None, None
     st.session_state["evd_fp"] = hashlib.sha1(up.getvalue()).hexdigest()[:12]
+    if "label_source" in ref.columns and ref["label_source"].fillna("").str.contains("AI", case=False).any():
+        st.warning("⚠️ These labels were **drafted by an AI (Claude)**, not verified by a human annotator. Because the "
+                   "multi-agent framework also uses Claude, scores against them are biased and must not be reported as "
+                   "human-verified results. Review and correct the labels first, then replace the `label_source` value.")
     with st.expander(f"Label coverage · {len(labels)} labelled review(s)", expanded=bool(cov['unrecognised'].sum())):
         st.dataframe(cov, hide_index=True, width="stretch")
         if cov["unrecognised"].sum():

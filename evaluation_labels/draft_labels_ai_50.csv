@@ -1,0 +1,60 @@
+﻿review_id,app_id,rating,text,feedback_type,dimensions,sentiment,severity,priority,action,ticket,escalation,label_source
+R00952,Najiz,2,مافيه ولا خدمة تقدر تنجزها، أتمنى تفعيل الخدمات فيه، على الأقل الأشياء البسيطة مثل اقرار الدين,General Complaint,FULFILLMENT,Negative,Medium,P3,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R05387,SAUDIA,4,احتاج خاصية الدفع باستخدم ابل باي ضروري,Suggestion,FULFILLMENT,Neutral,Low,P4,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R01584,Kollona Amn,4,نرجو التعديل على نظام رفع الفيديو ما اقدر ارفع من الاستديو لازم نصور مباشره والصور كمان يطلع لي رساله الحجم كبير,Suggestion,EFFICIENCY;FULFILLMENT,Negative,Medium,P3,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R04467,RTV,5,متابعة ممتازة للبلاغات,Praise,NONE,Positive,None,None,NO_ACTION,no,no,AI-drafted (Claude) - NOT human-verified; review before use
+R01845,Kollona Amn,2,لا يمكن الاتصال بالخادم,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R00131,Nawafeth Munshaat,5,شكرا على التطبيق مفيد جدا.,Praise,NONE,Positive,None,None,NO_ACTION,no,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02221,SPL,3,اتمنى إضافة سبب ( قيمة الضريبة) او ( استرجاع الضريبة),Suggestion,FULFILLMENT,Neutral,Low,P4,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02599,SPL,3,التطبيق جيد. مشكلته التنبيهات تتكرر بشكل مزعج جدا بدون اظهار معلومات كاملة. ربط الشحنات لا يتم بشكل سريع.واحيانا لا يتم. خاصية التتبع سيئة.,Bug,INFORMATION_QUALITY;FULFILLMENT;EFFICIENCY,Negative,Medium,P3,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R00212,MEWA,4,التطبيق لا يدعم الموقع خاصه في هواتف جلكسي,Bug,SYSTEM_AVAILABILITY,Negative,Medium,P3,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R06453,Tawakkalna Services,2,المصحف غير مرتب الصفحة مقصوصة من اعلى يجب إعادة تنسيقة وتنزيل كما يجب,Bug,INFORMATION_QUALITY,Negative,Medium,P3,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R06369,Tawakkalna Services,2,التطبيق لا يعمل باللغة العربية,Bug,EFFICIENCY,Negative,Medium,P3,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R04816,Fazaah,1,لم يستطع حتى تسجيلي . التطبيق نفسه يبيله من يفزع له الله المستعان بس,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R06124,NAFATH,4,نواجه مشكله بالتحديث الجديد ايفون ١٦,Bug,SYSTEM_AVAILABILITY,Negative,Medium,P3,REQUEST_INFO,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R03327,Fatoraty,1,الصراحة نجمة كثير عليه برنامج فاشل جدا ومافي تطوير للبرنامج انا استخدمته وللأسف كل فواتيري اللي صورتها وادخلتها في البرنامج راحت نصيحة لا احد يعتمد عليه,Bug,FULFILLMENT,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02531,SPL,1,التطبيق  غير قابلة للاستعمال,General Complaint,,Negative,,,REQUEST_INFO,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02433,SPL,1,للاسف لا التطبيق يعمل ولا خدمة العملاء متعاونين,Bug,SYSTEM_AVAILABILITY;RESPONSIVENESS,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R04580,RTV,5,مع ان بلاغي يوم الجمعة الا اني استقبلت اتصال من الوزارة في اقل من عشر دقائق بعد البلاغ  الى الامام وخطوة مميزة,Praise,NONE,Positive,None,None,NO_ACTION,no,no,AI-drafted (Claude) - NOT human-verified; review before use
+R05435,SAUDIA,5,إضافة الرحلات للصفحة الرئيسيه يعطي سهوله للمتابعه الرحلات اضافة جميله ، اللون الازرق ممكن يكون اكثر نصاعه,Praise,EFFICIENCY,Positive,Low,P4,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R05925,Absher,5,تطبيق رهيب وسهل للمواطن الكثير ، الله يعطيكم العافيه,Praise,NONE,Positive,None,None,NO_ACTION,no,no,AI-drafted (Claude) - NOT human-verified; review before use
+R00981,Najiz,2,خدمة القضاء غير متوفر، لا يمكن جلب بيانات القضايا، حيث أن خانة القضاء يتم ذكر ;لا يوجد بيانات لعرضها;,Bug,SYSTEM_AVAILABILITY;INFORMATION_QUALITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R03505,RTV,1,خدمة رفع البلاغ التجاري لا تعمل,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R06148,NAFATH,2,التطبيق لا يعمل عطلني عن أعمالي,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R05825,SAUDIA,3,المشكلة ان الاجهزة اللي فيها زر الهوم لمس تكون الخيارات بالاسفل متداخلة مع زر الهوم  تم ارسال رسالة بالمشكلة مع صورة منها على البريد المذكور و تمت اعادة البريد بأن هناك قيود للارسال للبريد الإلكتروني المذكور,Bug,EFFICIENCY;CONTACT,Negative,Medium,P3,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02919,KAHRABA,4,التطبيق جيد جداً بما يحتوي من معلومات مهمة .. وأعتقد مازال هناك مساحة جيدة لتطوير التطبيق كإتاحة خيار سداد الفواتير، فهو أمر مطلوب من قبل العميل لتسهيل وتسريع من عملية السداد ... فهناك العديد من الشركات الخدمية في وطننا دون ذكر أسماء، قد تطورت بشكل متسارع وقدمت تطبيق جميل وشامل ويمكن أن يكون نموذجًا جيدًا لبقية الشركات الخدمية,Suggestion,FULFILLMENT,Positive,Low,P4,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R01088,Baladia Report,4,البرنامج لا يعمل بشكل صحيح ولا يرسل رسالة التفعيل ولا يخدم كزائر لرفع أي بلاغ.,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R04870,Fazaah,1,"هناك مشكله في تحديد مكانك ع الخريطه 
+تطبيق جيد لكن يحتاج الي صيانه",Bug,SYSTEM_AVAILABILITY,Negative,Medium,P3,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R00177,H_Volunteer,5,يحتاج شوية اهتمام,Suggestion,,Neutral,,,REQUEST_INFO,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R00670,Bayanati,3,في بياناتي أحاول أتجاوز الخطوة الأولى ويطلب في كل مرة إدخال الجهة الحكومية... رغم إدخالها,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R01664,Kollona Amn,4,امل اضافة خيارات الموقع عن طريق الاقمار الصناعيه حتى نتمكن من تحديد موقع اخر او الابلاغ عنه لعدم توفر الانترنت في ذلك الموقع,Suggestion,FULFILLMENT,Neutral,Low,P4,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R05316,SAUDIA,1,"التطبيق كان ممتاز من ناحية الحجز واضافة الاميال و بيانات الفرسان 
+الان التطبيق ما يؤدي حتى وظيفة الواجهة. 
+جدا سيء وماله أي تلاتين لزمة",Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02015,CST,3,يوجد مشكله اذا رفعت شكوى لا تظهر في ايقونه الشكاوى,Bug,FULFILLMENT,Negative,Medium,P3,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R03878,RTV,2,بعد الانتهاء من وضع الرقم المرسل ، يأتي تنبيه بحدوث خطأ غير معروف,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R05049,Enjoy Saudi,4,ممتاز التطبيق بس فيه بعض القلتشات ويصير ٥ نجوم,Bug,SYSTEM_AVAILABILITY,Positive,Low,P4,REQUEST_INFO,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02851,KAHRABA,1,في التطبيق السابق كان يسمح لي بمشاهدة فواتير والدتي  لسدادها اما الان لا يسمح هذا التطبيق الا بمشاهدة الفواتير المسجلة باسمي فقط,General Complaint,FULFILLMENT,Negative,Medium,P3,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R00835,GOSI,3,جيد ويحتاج تطوير,Suggestion,,Neutral,,,REQUEST_INFO,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02720,KAHRABA,1,"التطبيق القديم افضل منه بكثير
+ لا تستطيع رؤية سجل الفاتورة للاشهر السابقة كما في السابق 
+ لا يوجد حفظ للحسابات اللي تتابعها كما في القديم وغيرها الكثير ...  
+ رجعو التطبيق القديم  ما نبي لكم تطوير",General Complaint,FULFILLMENT,Negative,Medium,P3,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02444,SPL,5,كل مره اضيف معلومات الدخول والشحنات ويسجل خروج من حاله ويقفل من حاله,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02007,CST,4,تحتاجون الى توفير كافة البيانات اليكترونياً من ابشر بدل المطالبه بكتابتها ، مع توفير خيار توضيح المشكله من الشاكي بشكل اوضح ومرضي,Suggestion,EFFICIENCY,Neutral,Low,P4,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R00778,GOSI,3,البرنامج جدا جميل وفعال ولكن ينقصه اصدار جديد لتفعيل المشتركين في نظام الشرائح,Suggestion,FULFILLMENT,Positive,Low,P4,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02125,CST,5,شكرا لكم على الجودة المميزة للطلبات .. شكر من القلب,Praise,NONE,Positive,None,None,NO_ACTION,no,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02404,SPL,2,"حمّلت البرنامج لاجل استلام احد الشحنات الخاصة بي. 
+عندما ادرجت جميع معلوماتي. رفض تسجيل الدخول. بما انني ادخلت جميع المعلومات بشكل سليم. بالتالي لن استفيد اي شي من البرنامج. سوا اخذه مساحة من الهاتف 🙂💔",Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02465,SPL,3,التطبيق يرفض التثبيت ، مرة اخرى التطبيق يرفض التثبيت ارجو الحل,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R06085,NAFATH,2,"التطبيق جميل ويسهل عملية الدخول
+
+لكن الازعاج انه كل يوم نازل تحديث جديد",General Complaint,EFFICIENCY,Neutral,Low,P4,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R06014,Absher,5,المملكة تطورت وأصبحت دولة رقمية وحتي افضل من بعض دول اوروبا. للقضاء علي الفساد عزل المواطن عن الإدارة والذي بسببه تتطور الدول، وفقكم الله🌴🇹🇳🇸🇦🫒,Praise,NONE,Positive,None,None,NO_ACTION,no,no,AI-drafted (Claude) - NOT human-verified; review before use
+R04586,RTV,3,لازم يستعملوا طريقة جديدة بدل الطريقة الأثرية في تحديد المواقع .,Suggestion,FULFILLMENT,Negative,Low,P4,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R05654,SAUDIA,1,"تطبيق فاشل ، مو قادر اعمل دخول , ايش الفايدة",Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R05978,Absher,5,تطبيق رائع جدا.  لكن عندي ملاحظه اليه فصلتوا ابشر اعمال عن ابشر.  كثرة التطبيقات والخدمات المتداخلة مش كويسه,General Complaint,EFFICIENCY,Neutral,Low,P4,SERVICE_IMPROVEMENT,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R04601,RTV,2,قبل كل شي شكرا للقائمين على البرنامج ، لوحظ عند تشغيل البرنامج تحول كامل الشاشة الى سواد كامل مع عدم المقدره للعوده الى الشاشة الرئيسية ..  نوع الجهاز سام سونق  نوت 2  نظام التشغيل : اخر اصدار,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R01700,Kollona Amn,3,التطبيق لا يعمل عند إرسال البلاغ يعطي رسالة خطأ,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use
+R02648,SPL,4,البرنامج يفصل لما أضغط ;تتبع الشحنات;,Bug,SYSTEM_AVAILABILITY,Negative,High,P2,TECH_TICKET,yes,no,AI-drafted (Claude) - NOT human-verified; review before use

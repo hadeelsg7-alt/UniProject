@@ -68,9 +68,21 @@ FAILED = "FAILED"  # prediction placeholder when a system produced no output for
 SYSTEMS = {
     "multi_agent": "Multi-Agent framework",
     "single_llm": "Single LLM",
+    "single_llm_cot": "Single LLM (few-shot + CoT)",
     "sequential": "Sequential LLM pipeline",
+    "multi_agent_no_loop": "Multi-Agent w/o review loop (ablation)",
 }
-SYSTEM_COLORS = {"multi_agent": "#1BAF7A", "single_llm": "#2A78D6", "sequential": "#EB6834"}
+SYSTEM_ROLE = {
+    "multi_agent": "proposed framework",
+    "single_llm": "baseline: one zero-shot call",
+    "single_llm_cot": "strong baseline: worked examples + step-by-step reasoning",
+    "sequential": "baseline: three fixed calls, no tools / verification / loop",
+    "multi_agent_no_loop": "ablation: same framework, Agent 2 -> Agent 1 review loop disabled",
+}
+# Highlight encoding: the proposed framework in the brand accent, every comparison system in one neutral grey;
+# systems are always named on the axis / card, so identity never depends on colour.
+PROPOSED_COLOR, OTHER_COLOR = "#1BAF7A", "#8A9690"
+SYSTEM_COLORS = {k: (PROPOSED_COLOR if k == "multi_agent" else OTHER_COLOR) for k in SYSTEMS}
 
 
 # --------------------------------------------------------------------------- #
@@ -373,6 +385,7 @@ class Prediction:
     ticket: Optional[str] = None
     escalation: Optional[str] = None
     ticket_json: Optional[str] = None
+    evidence: list = field(default_factory=list)
     seconds: float = 0.0
     input_tokens: int = 0
     output_tokens: int = 0
@@ -391,6 +404,7 @@ class Prediction:
     def as_row(self) -> dict:
         d = asdict(self)
         d["dimensions"] = ";".join(sorted(self.dimensions)) if self.dimensions is not None else None
+        d["evidence"] = " || ".join(self.evidence)
         return d
 
 
@@ -428,6 +442,7 @@ def predictions_from_state(state: WorkflowState, system: str = "multi_agent") ->
     p.ticket = "yes" if a3.ticket is not None else "no"
     p.escalation = "yes" if a3.escalation.status == EscalationStatus.CANDIDATE_AWAITING_HUMAN_APPROVAL else "no"
     p.ticket_json = a3.ticket.model_dump_json() if a3.ticket is not None else None
+    p.evidence = [i.evidence for i in a1.issues]
     if state.errors:
         p.error = "; ".join(state.errors)
     return p
@@ -459,7 +474,7 @@ def ticket_json_validity(js: Optional[str]) -> tuple[bool, str]:
 
 
 def run_multi_agent(workflow, reviews: list[ReviewInput], reference_date: Optional[date] = None,
-                    progress: Optional[Callable[[int, int], None]] = None) -> list[Prediction]:
+                    progress: Optional[Callable[[int, int], None]] = None, system: str = "multi_agent") -> list[Prediction]:
     out = []
     llm = workflow.llm
     for k, r in enumerate(reviews):
@@ -467,9 +482,9 @@ def run_multi_agent(workflow, reviews: list[ReviewInput], reference_date: Option
         t0 = time.perf_counter()
         try:
             state = workflow.run(r, reference_date=reference_date)
-            p = predictions_from_state(state)
+            p = predictions_from_state(state, system)
         except Exception as e:  # noqa: BLE001 - record, never fake
-            p = Prediction(system="multi_agent", review_id=r.review_id, error=f"{type(e).__name__}: {e}")
+            p = Prediction(system=system, review_id=r.review_id, error=f"{type(e).__name__}: {e}")
         p.seconds = time.perf_counter() - t0
         i1, o1, c1 = llm.usage_snapshot()
         p.input_tokens, p.output_tokens, p.llm_calls = i1 - i0, o1 - o0, c1 - c0
@@ -596,7 +611,8 @@ def cost_usd(input_tokens: int, output_tokens: int, prices: tuple) -> Optional[f
 MACRO_FIELDS = ["feedback_type", "dimensions", "sentiment", "severity", "priority"]
 
 
-def overall_table(labels, results: dict[str, list[Prediction]], prices: dict[str, tuple]) -> pd.DataFrame:
+def overall_table(labels, results: dict[str, list[Prediction]], prices: dict[str, tuple],
+                  reviews: dict[str, ReviewInput] | None = None) -> pd.DataFrame:
     """One row per system: macro F1 per field, their mean, escalation F1, time and estimated cost."""
     rows = []
     for sys_key, preds in results.items():
@@ -613,12 +629,212 @@ def overall_table(labels, results: dict[str, list[Prediction]], prices: dict[str
             "macro_f1_mean": sum(avail) / len(avail) if avail else None,
             "escalation_f1": a3["escalation"]["f1"], "ticket_f1": a3["ticket"]["f1"],
             "json_validity_rate": a3["json_validity_rate"],
+            "severe_recall": severe_recall(labels, preds)["recall"],
+            "evidence_grounding_rate": grounding(preds, reviews or {})["rate"],
+            "reviews_with_unsupported_quote": grounding(preds, reviews or {})["reviews_with_unsupported"],
             "time_total_s": sum(p.seconds for p in preds), "time_per_review_s": sum(p.seconds for p in preds) / n,
             "input_tokens": tin, "output_tokens": tout, "llm_calls": sum(p.llm_calls for p in preds),
             "est_cost_usd": cost, "est_cost_per_review_usd": cost / n if cost is not None else None,
             "failed_reviews": sum(1 for p in preds if p.failed),
             "reviews_with_llm_fallback": sum(1 for p in preds if p.used_fallback),
         })
+    return pd.DataFrame(rows)
+
+
+# --------------------------------------------------------------------------- #
+# Evidence that the framework is better: reliability metrics, significance, subgroups
+# --------------------------------------------------------------------------- #
+SEVERE = {"High", "Critical"}
+
+
+def severe_recall(labels, preds) -> dict:
+    """Of the reviews a human labelled High/Critical, how many did the system also rate High/Critical?"""
+    t, p = _pairs(labels, preds, "severity")
+    yt = ["yes" if x in SEVERE else "no" for x in t]
+    yp = ["yes" if x in SEVERE else "no" for x in p]
+    return binary(yt, yp)
+
+
+def grounding(preds, reviews: dict[str, ReviewInput]) -> dict:
+    """Share of evidence quotes that are really in the review (normalised substring, tools.evidence_verifier)."""
+    total = ok = 0
+    bad_reviews = 0
+    for p in preds:
+        r = reviews.get(p.review_id)
+        if r is None or not p.evidence:
+            continue
+        res = [tools.evidence_verifier(r.text, q)["verified"] for q in p.evidence if str(q).strip()]
+        total += len(res)
+        ok += sum(res)
+        bad_reviews += any(not x for x in res)
+    return {"quotes": total, "verified": ok, "rate": ok / total if total else None, "reviews_with_unsupported": bad_reviews}
+
+
+def correctness(labels, preds, f: str) -> dict[str, bool]:
+    """Per review: is the prediction for field f exactly right? (dimensions: exact set match)."""
+    out = {}
+    for p in preds:
+        ref = labels.get(p.review_id, {})
+        if f in ref:
+            v = p.get(f)
+            if f == "dimensions":
+                v = v if isinstance(v, frozenset) else None
+            out[p.review_id] = v == ref[f]
+    return out
+
+
+def mcnemar(a: dict[str, bool], b: dict[str, bool]) -> dict:
+    """Exact (binomial) McNemar test on paired per-review correctness. b01 = only A right, b10 = only B right."""
+    from math import comb
+
+    ids = sorted(set(a) & set(b))
+    only_a = sum(1 for i in ids if a[i] and not b[i])
+    only_b = sum(1 for i in ids if b[i] and not a[i])
+    n = only_a + only_b
+    if n == 0:
+        pval = 1.0
+    else:
+        k = min(only_a, only_b)
+        pval = min(1.0, 2 * sum(comb(n, j) for j in range(k + 1)) / 2 ** n)
+    return {"n": len(ids), "only_a_correct": only_a, "only_b_correct": only_b, "p_value": pval}
+
+
+def _macro_f1(labels, preds, f: str):
+    t, p = _pairs(labels, preds, f)
+    if not t:
+        return None
+    return multilabel(t, p)["macro_f1"] if f == "dimensions" else multiclass(t, p)["macro_f1"]
+
+
+def _fast_macro_f1(t: list, p: list, multilabel_field: bool) -> Optional[float]:
+    """Same macro F1 as multiclass()/multilabel(), without pandas (used inside the bootstrap loop)."""
+    if not t:
+        return None
+    if multilabel_field:
+        P = [x if isinstance(x, frozenset) else frozenset() for x in p]
+        classes = set().union(*t, *P)
+        hit = lambda lab, x: lab in x  # noqa: E731
+    else:
+        P = p
+        classes = (set(t) | set(p)) - {FAILED, None}
+        hit = lambda lab, x: x == lab  # noqa: E731
+    if not classes:
+        return None
+    f1s = []
+    for lab in classes:
+        tp = sum(hit(lab, a) and hit(lab, b) for a, b in zip(t, P))
+        fp = sum(not hit(lab, a) and hit(lab, b) for a, b in zip(t, P))
+        fn = sum(hit(lab, a) and not hit(lab, b) for a, b in zip(t, P))
+        pr = tp / (tp + fp) if tp + fp else 0.0
+        rc = tp / (tp + fn) if tp + fn else 0.0
+        f1s.append(2 * pr * rc / (pr + rc) if pr + rc else 0.0)
+    return sum(f1s) / len(f1s)
+
+
+def bootstrap_ci(labels, preds, f: str, n_boot: int = 1000, seed: int = 42) -> tuple[Optional[float], Optional[float]]:
+    """95% percentile bootstrap CI of macro F1, resampling labelled reviews with replacement."""
+    import random
+
+    t, p = _pairs(labels, preds, f)
+    if len(t) < 5:
+        return None, None
+    rng = random.Random(seed)
+    idx = range(len(t))
+    vals = []
+    for _ in range(n_boot):
+        sample = [rng.choice(idx) for _ in idx]
+        v = _fast_macro_f1([t[i] for i in sample], [p[i] for i in sample], f == "dimensions")
+        if v is not None:
+            vals.append(v)
+    if not vals:
+        return None, None
+    vals.sort()
+    return vals[int(0.025 * len(vals))], vals[min(len(vals) - 1, int(0.975 * len(vals)))]
+
+
+SIG_FIELDS = ["feedback_type", "dimensions", "sentiment", "severity", "priority", "action", "ticket", "escalation"]
+
+
+def significance_table(labels, results: dict[str, list[Prediction]], proposed: str = "multi_agent") -> pd.DataFrame:
+    """Proposed framework vs every other system, per field: accuracy of both + exact McNemar p-value."""
+    if proposed not in results:
+        return pd.DataFrame()
+    rows = []
+    base = results[proposed]
+    for sys_key, preds in results.items():
+        if sys_key == proposed:
+            continue
+        for f in SIG_FIELDS:
+            a, b = correctness(labels, base, f), correctness(labels, preds, f)
+            if not a:
+                continue
+            m = mcnemar(a, b)
+            ids = set(a) & set(b)
+            acc_a = sum(a[i] for i in ids) / len(ids) if ids else None
+            acc_b = sum(b[i] for i in ids) / len(ids) if ids else None
+            verdict = ("not significant" if m["p_value"] >= 0.05 else
+                       ("framework better" if m["only_a_correct"] > m["only_b_correct"] else "framework worse"))
+            rows.append({"compared_with": SYSTEMS.get(sys_key, sys_key), "field": f, "n": m["n"],
+                         "framework_accuracy": acc_a, "other_accuracy": acc_b,
+                         "only_framework_right": m["only_a_correct"], "only_other_right": m["only_b_correct"],
+                         "p_value": round(m["p_value"], 4), "result (alpha 0.05)": verdict})
+    return pd.DataFrame(rows)
+
+
+def ci_table(labels, results: dict[str, list[Prediction]], fields=MACRO_FIELDS, n_boot: int = 1000) -> pd.DataFrame:
+    rows = []
+    for sys_key, preds in results.items():
+        for f in fields:
+            v = _macro_f1(labels, preds, f)
+            if v is None:
+                continue
+            lo, hi = bootstrap_ci(labels, preds, f, n_boot=n_boot)
+            rows.append({"system_key": sys_key, "system": SYSTEMS.get(sys_key, sys_key), "field": f,
+                         "macro_f1": v, "ci_low": lo, "ci_high": hi})
+    return pd.DataFrame(rows)
+
+
+def subgroups(reviews: dict[str, ReviewInput], labels) -> dict[str, set]:
+    """Hard cases, each defined from the text or the human labels only (never from a system's output)."""
+    from arabic_text import word_count
+
+    g = {"All labelled": set(), "Saudi dialect": set(), "Multi-issue (2+ dimensions)": set(),
+         "Short / vague (<= 5 words)": set(), "Rating contradicts content": set()}
+    for rid, lab in labels.items():
+        r = reviews.get(rid)
+        if r is None:
+            continue
+        g["All labelled"].add(rid)
+        if tools.dialect_lexicon_lookup(r.text)["dialect_terms"]:
+            g["Saudi dialect"].add(rid)
+        if isinstance(lab.get("dimensions"), frozenset) and len(lab["dimensions"]) >= 2:
+            g["Multi-issue (2+ dimensions)"].add(rid)
+        if word_count(r.text) <= 5:
+            g["Short / vague (<= 5 words)"].add(rid)
+        if r.rating is not None and ((r.rating >= 4 and lab.get("severity") in SEVERE | {"Medium"})
+                                     or (r.rating <= 2 and lab.get("feedback_type") == "Praise")):
+            g["Rating contradicts content"].add(rid)
+    return g
+
+
+def subgroup_table(labels, results: dict[str, list[Prediction]], reviews: dict[str, ReviewInput],
+                   fields=("feedback_type", "severity", "action")) -> pd.DataFrame:
+    """Accuracy per hard-case subgroup and system (exact match per field, averaged over the given fields)."""
+    rows = []
+    for gname, ids in subgroups(reviews, labels).items():
+        if not ids:
+            continue
+        for sys_key, preds in results.items():
+            sub = [p for p in preds if p.review_id in ids]
+            row = {"subgroup": gname, "n": len(ids), "system_key": sys_key, "system": SYSTEMS.get(sys_key, sys_key)}
+            accs = []
+            for f in fields:
+                c = correctness(labels, sub, f)
+                row[f"acc_{f}"] = sum(c.values()) / len(c) if c else None
+                if c:
+                    accs.append(row[f"acc_{f}"])
+            row["mean_accuracy"] = sum(accs) / len(accs) if accs else None
+            rows.append(row)
     return pd.DataFrame(rows)
 
 

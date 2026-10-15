@@ -6,6 +6,8 @@ rule descriptions and the action definitions) so that the comparison measures
 the architecture, not the information available:
 
 * Single LLM - one structured call does everything at once.
+* Single LLM (few-shot + CoT) - the strongest single-call baseline: worked examples and step-by-step
+  reasoning before the answer.
 * Sequential LLM pipeline - three fixed LLM calls (classify -> assess ->
   decide), each feeding the next.
 
@@ -55,8 +57,23 @@ class SingleLLMOutput(BaseModel):
     priority: PriorityLit
     action: ActionLit
     escalation_candidate: bool
+    evidence: list[str] = Field(default_factory=list, description="Exact quotes from the review supporting the issues")
     ticket: Optional[BaselineTicket] = Field(default=None, description="Required unless action is NO_ACTION")
     reasoning: str = ""
+
+
+class SingleLLMCoTOutput(BaseModel):
+    """Same fields as SingleLLMOutput, but the step-by-step reasoning is written FIRST (chain of thought)."""
+    reasoning: str = Field(description="Think step by step: issues, evidence, impact on completing the service, rules, decision")
+    feedback_type: FeedbackTypeLit
+    dimensions: list[DimensionLit] = Field(default_factory=list)
+    sentiment: SentimentLit
+    severity: SeverityLit
+    priority: PriorityLit
+    action: ActionLit
+    escalation_candidate: bool
+    evidence: list[str] = Field(default_factory=list, description="Exact quotes from the review")
+    ticket: Optional[BaselineTicket] = None
 
 
 class StepClassify(BaseModel):
@@ -131,6 +148,39 @@ def _ticket_json(r: ReviewInput, action: str, esc: bool, t: Optional[BaselineTic
     return data.model_dump_json()
 
 
+# Worked examples for the few-shot baseline. They are written for this purpose and are NOT taken from the
+# dataset, so no test review leaks into the prompt.
+FEW_SHOT = """Worked examples (invented, not from the test set):
+
+Review: "كل ما ادخل يطلع لي خطأ في النظام وما قدرت اسدد المخالفة، والمبلغ انخصم مرتين"
+-> feedback_type=Bug, dimensions=[SYSTEM_AVAILABILITY, FULFILLMENT], sentiment=Negative,
+   severity=Critical (payment blocked AND money deducted twice = financial risk), priority=P1, action=TECH_TICKET,
+   escalation_candidate=false (no previous complaint mentioned), evidence=["يطلع لي خطأ في النظام", "المبلغ انخصم مرتين"]
+
+Review: "ياليت تضيفون الوضع الليلي، التطبيق ممتاز"
+-> feedback_type=Suggestion, dimensions=[EFFICIENCY], sentiment=Positive, severity=Low, priority=P4,
+   action=SERVICE_IMPROVEMENT, escalation_candidate=false, evidence=["ياليت تضيفون الوضع الليلي"]
+
+Review: "سيء"
+-> feedback_type=General Complaint, dimensions=[], sentiment=Negative, severity=None, priority=None,
+   action=REQUEST_INFO (nothing concrete to act on), escalation_candidate=false, evidence=[]
+
+Review: "رفعت شكوى رقم 12345 قبل شهر وللحين ما احد رد، والتطبيق للحين ما يفتح"
+-> feedback_type=Bug, dimensions=[SYSTEM_AVAILABILITY, RESPONSIVENESS], sentiment=Negative, severity=High, priority=P2,
+   action=FOLLOW_UP (a complaint is mentioned but its status and SLA cannot be verified, so it is not yet an escalation
+   candidate), escalation_candidate=false, evidence=["التطبيق للحين ما يفتح", "رفعت شكوى رقم 12345 قبل شهر"]
+"""
+
+
+def single_llm_cot(llm: LLMClient, r: ReviewInput) -> Prediction:
+    p = Prediction(system="single_llm_cot", review_id=r.review_id)
+    out = llm.structured(ROLE + "\n\n" + knowledge() + "\n\n" + FEW_SHOT,
+                         _review_block(r) + "\n\nReason step by step in `reasoning` first, then give the complete analysis.",
+                         SingleLLMCoTOutput)
+    _fill(p, r, out, out, out)
+    return p
+
+
 def _fill(p: Prediction, r: ReviewInput, cls, assess, decide) -> None:
     p.feedback_type = cls.feedback_type
     p.dimensions = frozenset(cls.dimensions)
@@ -139,6 +189,7 @@ def _fill(p: Prediction, r: ReviewInput, cls, assess, decide) -> None:
     p.escalation = "yes" if decide.escalation_candidate else "no"
     p.ticket = "yes" if decide.ticket is not None else "no"
     p.ticket_json = _ticket_json(r, decide.action, decide.escalation_candidate, decide.ticket, list(cls.dimensions))
+    p.evidence = list(getattr(cls, "evidence", []) or (decide.ticket.evidence if decide.ticket else []))
 
 
 def single_llm(llm: LLMClient, r: ReviewInput) -> Prediction:
@@ -163,6 +214,7 @@ def sequential_pipeline(llm: LLMClient, r: ReviewInput) -> Prediction:
 
 BASELINES: dict[str, Callable[[LLMClient, ReviewInput], Prediction]] = {
     "single_llm": single_llm,
+    "single_llm_cot": single_llm_cot,
     "sequential": sequential_pipeline,
 }
 

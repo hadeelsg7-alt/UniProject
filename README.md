@@ -238,6 +238,10 @@ You can change all thresholds in `knowledge_base/*.json` without touching the co
      - **Agent 2:** sentiment, severity and priority, with P, R and Macro F1. The star rating is shown only as a supporting
        indicator for sentiment.
      - **Agent 3:** ticket and escalation decisions, with P, R and F1, plus the JSON ticket validity rate.
+     - **Statistical evidence:** the framework is compared with a few-shot + chain-of-thought single LLM and with an
+       ablation that has no review loop. The comparison uses an exact McNemar test per field, 95% bootstrap CIs of Macro F1,
+       severe-case recall, evidence grounding (no invented quotes), and hard-case subgroups (dialect, multi-issue,
+       short/vague, rating contradicts content). The summary also states where the framework is *not* better.
      - **Overall:** Multi-Agent vs Single LLM vs Sequential LLM pipeline on the same set. It shows Macro F1, Escalation F1,
        processing time per review, and estimated cost.
   3. Baselines need a working LLM. If they cannot run, they are recorded as failed and never simulated. Cost is an

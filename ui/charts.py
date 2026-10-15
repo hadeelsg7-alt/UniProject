@@ -175,3 +175,51 @@ def system_grouped_f1(long: pd.DataFrame, colors: dict[str, str]) -> alt.Chart:
                         legend=alt.Legend(orient="top", direction="vertical")))
     labels = base.mark_text(align="left", dx=3, fontSize=11, color=T.INK_2).encode(text=alt.Text("f1:Q", format=".2f"))
     return _style(bars + labels, max(180, 22 * len(long) + 60))
+
+
+def faceted_system_bars(df: pd.DataFrame, facet: str, value: str, colors: dict[str, str], title: str,
+                        fmt: str = ".2f", domain_max: float | None = 1.08, width: int = 460) -> alt.Chart:
+    """Small multiples: one block per `facet` value, one labelled bar per system. Colour only highlights the
+    proposed system; the system name is always on the axis."""
+    d = df.dropna(subset=[value]).copy()
+    keys = list(dict.fromkeys(d["system_key"]))
+    names = list(dict.fromkeys(d["system"]))
+    base = alt.Chart().encode(
+        y=alt.Y("system:N", title=None, sort=names, axis=alt.Axis(labelLimit=240, labelOverlap=False)),
+        x=alt.X(f"{value}:Q", title=title, scale=alt.Scale(domain=[0, domain_max or float(d[value].max() or 1) * 1.3])),
+        tooltip=[alt.Tooltip(f"{facet}:N"), alt.Tooltip("system:N", title="System"), alt.Tooltip(f"{value}:Q", title=title, format=".3f")])
+    bars = base.mark_bar(cornerRadiusEnd=4, height={"band": 0.7}).encode(
+        color=alt.Color("system_key:N", scale=alt.Scale(domain=keys, range=[colors[k] for k in keys]), legend=None))
+    labels = base.mark_text(align="left", dx=4, color=T.INK_2, fontSize=11).encode(text=alt.Text(f"{value}:Q", format=fmt))
+    chart = alt.layer(bars, labels, data=d).properties(height=24 * len(names) + 10, width=width).facet(
+        row=alt.Row(f"{facet}:N", title=None, sort=list(dict.fromkeys(d[facet])),
+                    header=alt.Header(labelAngle=0, labelAlign="left", labelAnchor="start", labelFontWeight="bold",
+                                      labelFont=FONT, labelColor=T.INK, labelFontSize=12, labelOrient="top")),
+        spacing=6)
+    return (chart.configure_view(strokeWidth=0)
+            .configure_axis(labelFont=FONT, titleFont=FONT, labelColor=T.INK_2, titleColor=T.INK_2, gridColor="#EDF3EF",
+                            domain=False, tickColor="#EDF3EF", labelFontSize=12, titleFontSize=12))
+
+
+def ci_chart(df: pd.DataFrame, colors: dict[str, str], width: int = 460) -> alt.Chart:
+    """Macro F1 point estimate with its 95% bootstrap interval, per field (small multiples) and system."""
+    d = df.dropna(subset=["macro_f1"]).copy()
+    keys = list(dict.fromkeys(d["system_key"]))
+    names = list(dict.fromkeys(d["system"]))
+    base = alt.Chart().encode(y=alt.Y("system:N", title=None, sort=names, axis=alt.Axis(labelLimit=240, labelOverlap=False)))
+    rule = base.mark_rule(strokeWidth=2).encode(
+        x=alt.X("ci_low:Q", title="Macro F1 (95% bootstrap CI)", scale=alt.Scale(domain=[0, 1])), x2="ci_high:Q",
+        color=alt.Color("system_key:N", scale=alt.Scale(domain=keys, range=[colors[k] for k in keys]), legend=None))
+    point = base.mark_point(filled=True, size=90, stroke="#FFFFFF", strokeWidth=2).encode(
+        x="macro_f1:Q", color=alt.Color("system_key:N", scale=alt.Scale(domain=keys, range=[colors[k] for k in keys]), legend=None),
+        tooltip=[alt.Tooltip("field:N"), alt.Tooltip("system:N"), alt.Tooltip("macro_f1:Q", format=".3f"),
+                 alt.Tooltip("ci_low:Q", title="CI low", format=".3f"), alt.Tooltip("ci_high:Q", title="CI high", format=".3f")])
+    text = base.mark_text(align="left", dx=8, dy=-8, fontSize=11, color=T.INK_2).encode(x="macro_f1:Q", text=alt.Text("macro_f1:Q", format=".2f"))
+    chart = alt.layer(rule, point, text, data=d).properties(height=24 * len(names) + 10, width=width).facet(
+        row=alt.Row("field:N", title=None, sort=list(dict.fromkeys(d["field"])),
+                    header=alt.Header(labelAngle=0, labelAlign="left", labelAnchor="start", labelFontWeight="bold",
+                                      labelFont=FONT, labelColor=T.INK, labelFontSize=12, labelOrient="top")),
+        spacing=6)
+    return (chart.configure_view(strokeWidth=0)
+            .configure_axis(labelFont=FONT, titleFont=FONT, labelColor=T.INK_2, titleColor=T.INK_2, gridColor="#EDF3EF",
+                            domain=False, tickColor="#EDF3EF", labelFontSize=12, titleFontSize=12))

@@ -189,3 +189,47 @@ def test_review_workbook_roundtrip_tracks_human_changes():
     ch = E.label_changes(ref, orig).set_index("field")
     assert ch.loc["severity", "changed_by_reviewer"] == 1 and ch.loc["ticket", "changed_by_reviewer"] == 0
     assert "Guide" in wb.sheetnames and wb["AI_original"].protection.sheet
+
+
+# ---------------------------------------------------------------- comparison evidence
+def test_mcnemar_exact_values():
+    a = {f"r{i}": True for i in range(10)}
+    b = {f"r{i}": i >= 8 for i in range(10)}  # framework alone right on 8, other alone right on 0
+    m = E.mcnemar(a, b)
+    assert (m["only_a_correct"], m["only_b_correct"]) == (8, 0)
+    assert m["p_value"] == pytest.approx(2 / 2 ** 8)  # 0.0078
+    assert E.mcnemar(a, a)["p_value"] == 1.0
+
+
+def test_severe_recall_and_grounding():
+    labels = {"T1": {"severity": "High"}, "T2": {"severity": "Low"}}
+    preds = [E.Prediction("s", "T1", severity="Medium", evidence=["التطبيق يطلع خطأ", "كلام مخترع غير موجود"]),
+             E.Prediction("s", "T2", severity="Low", evidence=[])]
+    assert E.severe_recall(labels, preds)["recall"] == 0.0
+    g = E.grounding(preds, {"T1": R1, "T2": R2})
+    assert g["quotes"] == 2 and g["verified"] == 1 and g["reviews_with_unsupported"] == 1
+
+
+def test_significance_and_subgroups_and_ci():
+    labels = {"T1": {"feedback_type": "Bug", "severity": "High", "dimensions": frozenset({"A", "B"})},
+              "T2": {"feedback_type": "Praise", "severity": "None"}}
+    res = {"multi_agent": [E.Prediction("multi_agent", "T1", feedback_type="Bug"), E.Prediction("multi_agent", "T2", feedback_type="Praise")],
+           "single_llm": [E.Prediction("single_llm", "T1", feedback_type="Bug"), E.Prediction("single_llm", "T2", feedback_type="Bug")]}
+    sig = E.significance_table(labels, res).set_index("field")
+    assert sig.loc["feedback_type", "only_framework_right"] == 1 and sig.loc["feedback_type", "result (alpha 0.05)"] == "not significant"
+    groups = E.subgroups({"T1": R1, "T2": R2}, labels)
+    assert groups["Multi-issue (2+ dimensions)"] == {"T1"} and groups["All labelled"] == {"T1", "T2"}
+    assert E.bootstrap_ci(labels, res["multi_agent"], "feedback_type") == (None, None)  # too few reviews -> no CI
+    sub = E.subgroup_table(labels, res, {"T1": R1, "T2": R2})
+    assert set(sub["system_key"]) == {"multi_agent", "single_llm"}
+
+
+def test_cot_baseline_and_ablation_system():
+    out = B.SingleLLMCoTOutput(reasoning="step by step", feedback_type="Praise", sentiment="Positive", severity="None",
+                               priority="None", action="NO_ACTION", escalation_candidate=False, evidence=["تطبيق رائع"])
+    stub = StubLLM({"SingleLLMCoTOutput": [out]})
+    [p] = B.run_baseline("single_llm_cot", stub, [R2])
+    assert p.system == "single_llm_cot" and p.action == "NO_ACTION" and p.evidence == ["تطبيق رائع"]
+    assert list(B.SingleLLMCoTOutput.model_fields)[0] == "reasoning"  # reasoning is generated before the answer
+    preds = E.run_multi_agent(MultiAgentWorkflow(LLMClient(provider="offline"), max_revisions=0), [R1], system="multi_agent_no_loop")
+    assert preds[0].system == "multi_agent_no_loop" and preds[0].evidence

@@ -14,6 +14,7 @@ import streamlit as st
 import baselines
 import evaluation_suite as E
 from ui import charts as CH
+from workflow import MultiAgentWorkflow
 from ui import components as C
 
 A_COLORS = {k: C.AGENTS[k]["color"] for k in ("Agent1", "Agent2", "Agent3")}
@@ -124,26 +125,39 @@ def _step_run(c, ref: pd.DataFrame, labels: dict):
         return None
     llm_ok = c.llm.available
     options = list(E.SYSTEMS)
-    sel = st.multiselect("Systems", options, default=options if llm_ok else ["multi_agent"], format_func=E.SYSTEMS.get,
-                         key="evd_systems")
+    sel = st.multiselect("Systems", options, default=options if llm_ok else ["multi_agent", "multi_agent_no_loop"],
+                         format_func=E.SYSTEMS.get, key="evd_systems")
+    with st.expander("What each system is (same Claude model and same knowledge for all — only the architecture differs)"):
+        st.dataframe(pd.DataFrame([{"system": E.SYSTEMS[k], "role": E.SYSTEM_ROLE[k]} for k in E.SYSTEMS]),
+                     hide_index=True, width="stretch")
     if not llm_ok:
-        st.warning("Offline mode: the Single LLM and Sequential pipeline baselines need a working LLM, so they will be "
-                   "recorded as **not run** (failed), never simulated. The multi-agent framework runs with its rule-based reasoner.")
-    calls = {"multi_agent": "≈3–6", "single_llm": "1", "sequential": "3"}
+        st.warning("Offline mode: the LLM baselines (Single LLM, few-shot + CoT, Sequential) need a working LLM, so they will be "
+                   "recorded as **not run** (failed), never simulated. The multi-agent framework and its ablation run with "
+                   "the rule-based reasoner.")
+    calls = {"multi_agent": "≈3–6", "single_llm": "1", "single_llm_cot": "1", "sequential": "3", "multi_agent_no_loop": "≈3–4"}
     st.caption(f"{len(reviews)} review(s) × {len(sel)} system(s). LLM calls per review: "
                + " · ".join(f"{E.SYSTEMS[s]} {calls[s]}" for s in sel) + (" (offline: 0)" if not llm_ok else ""))
 
+    prev = st.session_state.get("evd_run_result")
+    keep = (prev is not None and prev.engine == c.llm.name and st.session_state.get("evd_run_fp") == st.session_state.get("evd_fp"))
+    if keep:
+        st.caption("Already run: " + ", ".join(E.SYSTEMS[s] for s in prev.results)
+                   + ". Running again replaces only the selected systems, so you can add a system without paying for the others again.")
     if st.button("▶ Run evaluation", type="primary", key="evd_run", disabled=not sel):
-        run = E.EvalRun(engine=c.llm.name)
+        run = prev if keep else E.EvalRun(engine=c.llm.name)
         for s in sel:
             bar = st.progress(0.0, text=f"{E.SYSTEMS[s]}: 0/{len(reviews)}")
             prog = lambda k, n, s=s, bar=bar: bar.progress(k / n, text=f"{E.SYSTEMS[s]}: {k}/{n}")  # noqa: E731
             if s == "multi_agent":
                 run.results[s] = E.run_multi_agent(c.workflow, reviews, reference_date=c.ref_date, progress=prog)
+            elif s == "multi_agent_no_loop":
+                wf = MultiAgentWorkflow(c.llm, max_revisions=0)
+                run.results[s] = E.run_multi_agent(wf, reviews, reference_date=c.ref_date, progress=prog, system=s)
             else:
                 run.results[s] = baselines.run_baseline(s, c.llm, reviews, progress=prog)
             run.prices[s] = c.llm.price_per_mtok()
             bar.empty()
+        run.results = {k: run.results[k] for k in E.SYSTEMS if k in run.results}  # stable order
         st.session_state["evd_run_result"] = run
         st.session_state["evd_reviews"] = {r.review_id: r for r in reviews}
         st.session_state["evd_run_fp"] = st.session_state.get("evd_fp")
@@ -181,6 +195,7 @@ def _results(run: E.EvalRun, labels: dict) -> None:
     _agent2(preds, labels)
     _agent3(preds, labels)
     _overall(run, labels)
+    _proof(run, labels)
 
 
 def _multiclass_block(title: str, m: dict, color: str, order: list[str] | None, key: str) -> None:
@@ -270,7 +285,7 @@ def _agent3(preds, labels) -> None:
 
 
 def _overall(run: E.EvalRun, labels: dict) -> None:
-    tab = E.overall_table(labels, run.results, run.prices)
+    tab = E.overall_table(labels, run.results, run.prices, st.session_state.get("evd_reviews"))
     colors = E.SYSTEM_COLORS
     with st.container(key="frame_Overall_evd"):
         C.md('<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">'
@@ -292,25 +307,24 @@ def _overall(run: E.EvalRun, labels: dict) -> None:
         long = pd.DataFrame([{"field": FIELD_TITLES[f], "system_key": r.system_key, "system": r.system, "f1": r[f"macro_f1_{f}"]}
                              for _, r in tab.iterrows() for f in E.MACRO_FIELDS if r[f"macro_f1_{f}"] is not None
                              and not pd.isna(r[f"macro_f1_{f}"])])
-        g1, g2 = st.columns([3, 2])
-        with g1, st.container(border=True):
+        with st.container(border=True):
             st.markdown("**Macro F1 per field**")
             if long.empty:
                 st.caption("No labelled fields to compare.")
             else:
-                st.altair_chart(CH.system_grouped_f1(long, colors), width="stretch", key="evd_ov_f1")
-        with g2:
-            with st.container(border=True):
-                st.markdown("**Escalation F1**")
-                if tab["escalation_f1"].notna().any():
-                    st.altair_chart(CH.system_metric_bars(tab, "escalation_f1", "F1", colors, domain_max=1.08),
-                                    width="stretch", key="evd_ov_esc")
-                else:
-                    st.caption("n/a — no reference escalation 'yes' cases in the labelled set.")
-            with st.container(border=True):
-                st.markdown("**Processing time** (mean seconds per review)")
-                st.altair_chart(CH.system_metric_bars(tab, "time_per_review_s", "Seconds", colors, fmt=".2f"),
-                                width="stretch", key="evd_ov_time")
+                st.altair_chart(CH.faceted_system_bars(long, "field", "f1", colors, "Macro F1"), key="evd_ov_f1")
+        g1, g2 = st.columns(2)
+        with g1, st.container(border=True):
+            st.markdown("**Escalation F1**")
+            if tab["escalation_f1"].notna().any():
+                st.altair_chart(CH.system_metric_bars(tab, "escalation_f1", "F1", colors, domain_max=1.08),
+                                width="stretch", key="evd_ov_esc")
+            else:
+                st.caption("n/a — no reference escalation 'yes' cases in the labelled set.")
+        with g2, st.container(border=True):
+            st.markdown("**Processing time** (mean seconds per review)")
+            st.altair_chart(CH.system_metric_bars(tab, "time_per_review_s", "Seconds", colors, fmt=".2f"),
+                            width="stretch", key="evd_ov_time")
         with st.container(border=True):
             st.markdown("**Estimated cost** (USD per review = counted tokens × configured price per million tokens)")
             if tab["est_cost_per_review_usd"].notna().any():
@@ -331,6 +345,89 @@ def _overall(run: E.EvalRun, labels: dict) -> None:
                            .encode("utf-8"), "evaluation_metrics.json", "application/json", width="stretch")
 
 
+def _proof(run: E.EvalRun, labels: dict) -> None:
+    """Evidence that the framework is (or is not) better: reliability metrics, significance tests, CIs, hard cases."""
+    reviews = st.session_state.get("evd_reviews") or {}
+    colors = E.SYSTEM_COLORS
+    tab = E.overall_table(labels, run.results, run.prices, reviews)
+    with st.container(key="frame_Overall_proof"):
+        C.md('<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">'
+             '<span class="agent-tag" style="background:#0E3B2C;font-size:0.8rem;padding:4px 10px">EVIDENCE</span>'
+             '<span class="agent-title" style="font-size:1.15rem">🧪 Is the framework better? — statistical evidence</span>'
+             '<span class="agent-ar" style="font-size:1rem">هل الإطار أفضل فعلاً؟</span></div>'
+             '<div class="small" style="margin:-2px 0 10px 0">Paired tests on the same reviews · 95% bootstrap intervals · '
+             'reliability · hard cases. The text below is generated from the numbers, including where the framework is not better.</div>')
+        if "multi_agent" not in run.results or len(run.results) < 2:
+            st.info("Run the Multi-Agent framework and at least one other system to compare them.")
+            return
+
+        sig = E.significance_table(labels, run.results)
+        if not sig.empty:
+            with st.container(border=True):
+                st.markdown("**Summary (alpha = 0.05, exact McNemar test on per-review correctness)**")
+                for other, g in sig.groupby("compared_with", sort=False):
+                    better = g[g["result (alpha 0.05)"] == "framework better"]["field"].tolist()
+                    worse = g[g["result (alpha 0.05)"] == "framework worse"]["field"].tolist()
+                    same = g[g["result (alpha 0.05)"] == "not significant"]["field"].tolist()
+                    parts = []
+                    if better:
+                        parts.append("✅ significantly **better** on " + ", ".join(f"`{x}`" for x in better))
+                    if worse:
+                        parts.append("❌ significantly **worse** on " + ", ".join(f"`{x}`" for x in worse))
+                    if same:
+                        parts.append("➖ no significant difference on " + ", ".join(f"`{x}`" for x in same))
+                    st.markdown(f"- vs **{other}**: " + "; ".join(parts))
+                n = int(sig["n"].max())
+                if n < 60:
+                    st.caption(f"With {n} labelled reviews only large differences can reach significance; "
+                               "'no significant difference' means the test set is too small to tell, not that the systems are equal.")
+                st.dataframe(sig.style.format({"framework_accuracy": "{:.3f}", "other_accuracy": "{:.3f}", "p_value": "{:.4f}"}),
+                             hide_index=True, width="stretch")
+
+        with st.container(border=True):
+            st.markdown("**Reliability — what matters for a government service**")
+            st.caption("Severe-case recall: of the reviews a human labelled High/Critical, the share the system also flagged High/Critical. "
+                       "Evidence grounding: share of quoted evidence that really appears in the review (no invented quotes).")
+            a, b = st.columns(2)
+            with a:
+                if tab["severe_recall"].notna().any():
+                    st.altair_chart(CH.system_metric_bars(tab, "severe_recall", "Severe-case recall", colors, fmt=".2f", domain_max=1.08),
+                                    width="stretch", key="evd_pf_sev")
+                else:
+                    st.caption("No High/Critical cases in the labels.")
+            with b:
+                if tab["evidence_grounding_rate"].notna().any():
+                    st.altair_chart(CH.system_metric_bars(tab, "evidence_grounding_rate", "Evidence grounding rate", colors,
+                                                          fmt=".2f", domain_max=1.08), width="stretch", key="evd_pf_grd")
+                else:
+                    st.caption("No evidence quotes produced.")
+            st.dataframe(tab[["system", "severe_recall", "evidence_grounding_rate", "reviews_with_unsupported_quote",
+                              "json_validity_rate", "failed_reviews"]], hide_index=True, width="stretch")
+
+        with st.container(border=True):
+            st.markdown("**Macro F1 with 95% bootstrap confidence intervals** (1,000 resamples of the labelled reviews)")
+            ci = E.ci_table(labels, run.results)
+            if ci.empty:
+                st.caption("Not enough labelled reviews (needs at least 5 per field).")
+            else:
+                ci["field"] = ci["field"].map(FIELD_TITLES)
+                st.altair_chart(CH.ci_chart(ci, colors), key="evd_pf_ci")
+                st.caption("Overlapping intervals mean the difference may be due to the particular sample of reviews.")
+
+        with st.container(border=True):
+            st.markdown("**Hard cases** — mean accuracy over feedback type, severity and action, per subgroup")
+            st.caption("Subgroups are defined from the review text and the human labels only, never from a system's output.")
+            sub = E.subgroup_table(labels, run.results, reviews)
+            if sub.empty:
+                st.caption("No subgroup could be formed.")
+            else:
+                sub["subgroup"] = sub["subgroup"] + " (n=" + sub["n"].astype(str) + ")"
+                st.altair_chart(CH.faceted_system_bars(sub, "subgroup", "mean_accuracy", colors, "Mean accuracy"),
+                                key="evd_pf_sub")
+                with st.expander("Subgroup table"):
+                    st.dataframe(sub.drop(columns=["system_key"]), hide_index=True, width="stretch")
+
+
 def _metrics_json(run: E.EvalRun, labels: dict) -> dict:
     def clean(m):
         if isinstance(m, dict):
@@ -341,4 +438,6 @@ def _metrics_json(run: E.EvalRun, labels: dict) -> dict:
     return {"engine": run.engine, "labelled_reviews": len(labels),
             "systems": {s: {"agent1": clean(E.agent1_metrics(labels, p)), "agent2": clean(E.agent2_metrics(labels, p, st.session_state.get("evd_reviews"))),
                             "agent3": clean(E.agent3_metrics(labels, p))} for s, p in run.results.items()},
-            "overall": E.overall_table(labels, run.results, run.prices).to_dict(orient="records")}
+            "overall": E.overall_table(labels, run.results, run.prices, st.session_state.get("evd_reviews")).to_dict(orient="records"),
+            "significance": E.significance_table(labels, run.results).to_dict(orient="records"),
+            "subgroups": E.subgroup_table(labels, run.results, st.session_state.get("evd_reviews") or {}).to_dict(orient="records")}

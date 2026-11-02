@@ -273,8 +273,32 @@ def sentiment_intensity(review_text: str, rating: Optional[int]) -> dict:
     return {"label": label, "score": round(score, 2), "negative_cues": neg, "positive_cues": pos, "rating": rating}
 
 
-_NEG_SENTIMENT = (lx.NEGATIVE + lx.HARD_FAILURE + lx.ERROR_CUES + lx.FRICTION + lx.CRASH_CUES
+_NEG_SENTIMENT = (lx.NEGATIVE + lx.SENTI_NEG + lx.MISSING + lx.HARD_FAILURE + lx.ERROR_CUES + lx.FRICTION + lx.CRASH_CUES
                   + [c for t in lx.TOPICS.values() if t.inherent_problem for c in t.cues])  # e.g. "يعلق" (freezes)
+_POS_SENTIMENT = lx.PRAISE + lx.SENTI_POS
+_NEGATORS = set(lx._n(lx.NEGATED_VERB_PARTICLES + lx.NEGATED_VERB_PARTICLES_SPACED + ["غير"]))
+_WISHED_QUALITIES = set(lx._n(["سهل", "سهولة", "سهوله", "سريع", "اسرع", "أسرع"]))
+_SUGGESTION_WORDS = {c for c in lx.SUGGESTION if " " not in c} | set(lx._n(["يكون", "يسهل", "الرجاء", "يرجى", "بحيث"]))
+_NEG_VERB_RE = re.compile(r"(?:(?<=[\s\W])|^)(?:(" + "|".join(sorted(lx.NEGATED_VERB_PARTICLES, key=len, reverse=True))
+                          + r")\s?|(" + "|".join(sorted(lx.NEGATED_VERB_PARTICLES_SPACED, key=len, reverse=True))
+                          + r")\s)([يتنا][\w؀-ۿ]{2,})")
+
+
+def _negated_verbs(text: str, nc) -> list[tuple[int, int]]:
+    """Spans (original indices) of 'negation particle + verb' such as "لاتعمل" / "لم تأتيني" / "ما ينرسل"."""
+    norm, idx = nc
+    out = []
+    for m in _NEG_VERB_RE.finditer(norm):
+        verb = m.group(3)
+        if any(verb.startswith(e) for e in lx.NEGATED_VERB_EXCEPTIONS):
+            continue
+        if (m.group(1) or "").endswith("ما") and verb.endswith("ه"):  # relative "ما": "ماتفعله الهيئة" = "what it does"
+            continue
+        before = norm[max(0, m.start() - 14):m.start()].split()
+        if any(b in lx.NEGATED_VERB_SKIP_AFTER for b in before[-2:]):
+            continue
+        out.append((idx[m.start()], idx[m.end() - 1] + 1))
+    return out
 
 
 def sentiment_analyzer(review_text: str, rating: Optional[int] = None) -> dict:
@@ -285,13 +309,24 @@ def sentiment_analyzer(review_text: str, rating: Optional[int] = None) -> dict:
     reported as a supporting indicator only; it never changes the label."""
     nc = normalize_with_map(review_text)
     pos_hits, neg_hits = [], []
-    for h in find_cues(review_text, lx.PRAISE, nc):
+    for h in find_cues(review_text, _POS_SENTIMENT, nc):
         before = review_text[max(0, h.start - 6):h.start].split()
-        if before and normalize(before[-1]) in lx.NEGATION:
+        near = [normalize(w) for w in review_text[max(0, h.start - 40):h.start].split()[-3:]]
+        if any(w in _NEGATORS for w in near[:-1]):  # "ولا يعمل جيدا": praise inside a negated clause is not praise
+            continue
+        if h.cue in _WISHED_QUALITIES:  # "يحتاج يكون سريع" / "لسهولة الاستخدام" is a wish, not praise
+            window = [normalize(w) for w in review_text[max(0, h.start - 60):h.start].split()[-8:]]
+            if normalize(review_text[h.start:h.end]).startswith("ل") or any(w in _SUGGESTION_WORDS for w in window):
+                continue
+        if before and (normalize(before[-1]) in lx.NEGATION or normalize(before[-1]) in _NEGATORS):
             neg_hits.append(f"{before[-1]} {review_text[h.start:h.end]}")
         else:
             pos_hits.append(review_text[h.start:h.end])
-    neg_hits += [review_text[h.start:h.end] for h in find_cues(review_text, _NEG_SENTIMENT, nc)]
+    neg = find_cues(review_text, _NEG_SENTIMENT, nc) + find_cues(review_text, lx.SENTI_NEG_WHOLE_WORD, nc, whole_word=True)
+    neg_hits += [review_text[h.start:h.end] for h in neg]
+    taken = [(h.start, h.end) for h in neg]
+    neg_hits += [review_text[a:b] for a, b in _negated_verbs(review_text, nc)
+                 if not any(a < e and s < b for s, e in taken)]  # not already counted as a failure cue
     pos, neg = len(pos_hits), len(neg_hits)
     label = "Mixed" if pos and neg else "Positive" if pos else "Negative" if neg else "Neutral"
     score = round((pos - neg) / (pos + neg), 2) if pos + neg else 0.0

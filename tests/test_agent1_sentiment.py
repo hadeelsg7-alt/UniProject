@@ -82,3 +82,26 @@ def test_logo_is_bundled_and_used_in_pdf_and_pages():
     st = _run("التطبيق يعلق كل ما افتحه", rating=1)
     pdf = report_pdf.build_executive_report(INS.compute_insights([st]))
     assert b"/Subtype /Image" in pdf
+
+
+@pytest.mark.parametrize("text,expected", [
+    # real-style comments that the first lexicon left as Neutral
+    ("خانه الحجز لها شهرين لاتعمل", "Negative"),
+    ("لم استطيع التسجيل ولم تأتيني رساله بالرمز", "Negative"),
+    ("عديم الفائدة ... يغلقون الشكوى بدون حل", "Negative"),
+    ("وجوده زي عدمه", "Negative"),
+    ("التطبيق القديم ارحم", "Negative"),
+    ("ماشاء الله مريح وخدمات كثيرة جزاكم الله خير", "Positive"),
+    ("لا تقصرون والله", "Positive"),
+    ("ماتفعله الهيئة مجهود جبار تشكر عليه", "Positive"),
+    # not negative: a wish, a question, "whenever", and a small issue word inside praise
+    ("يحتاج يكون البرنامج سريع فقط", "Neutral"),
+    ("لماذا لا تجعلون التسديد عن طريق التطبيق", "Neutral"),
+    ("التطبيق معلق ولا يعمل جيدا", "Negative"),
+    ("برنامج ممتاز هناك ملاحظة بسيطة", "Positive"),
+])
+def test_sentiment_reads_real_comment_wording(text, expected):
+    r = tools.sentiment_analyzer(text)
+    assert r["label"] == expected, r
+    for cue in r["positive_cues"] + r["negative_cues"]:  # evidence is always verbatim from the comment
+        assert cue in text or cue.split()[-1] in text

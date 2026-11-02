@@ -50,22 +50,26 @@ def page_eval_dashboard(show_hero: bool = True) -> None:
 def _session_results(c) -> None:
     """Label-free view of the session's analysis results: collaboration, decision consistency, exports."""
     from ui.pages import analysed
-    from workflow import state_to_dict, state_to_row
 
     states = analysed()
-    C.section("Session results and agent collaboration", "reviews analysed on the Data & Run Analysis page · no labels needed")
     if not states:
-        C.empty_state("📋", "No analysed reviews in this session", "Run the analysis on the Data & Run Analysis page.")
+        st.caption("No analysed reviews in this session yet — run the analysis on the Data & Run Analysis page.")
         return
+    with st.expander(f"Session results and agent collaboration · {len(states)} review(s) analysed (no labels needed)"):
+        _session_body(states)
+
+
+def _session_body(states) -> None:
+    from workflow import state_to_dict, state_to_row
     preds = [E.predictions_from_state(s) for s in states]
     col = E.collaboration_summary(preds)
     C.kpi_row([("Reviews analysed", col["reviews"], "three-agent workflow"),
                ("Reviews with a critique", col["with_review_request"], f"{col['review_requests']} request(s) Agent 2 → Agent 1"),
                ("Revision rounds", col["revision_rounds"], f"max {col['max_rounds_used']} per review (limit 2)"),
                ("Rule-based fallback", col["llm_fallback_reviews"], "reviews with an LLM failure", "warn" if col["llm_fallback_reviews"] else "")])
-    with st.expander("Evidence and decision consistency (label-free checks)"):
-        st.dataframe(E.consistency_rates(preds), hide_index=True, width="stretch")
-        st.caption("These checks test the agents against their own documented rules and the review text; they are not accuracy.")
+    st.markdown("**Evidence and decision consistency** (label-free checks)")
+    st.dataframe(E.consistency_rates(preds), hide_index=True, width="stretch")
+    st.caption("These checks test the agents against their own documented rules and the review text; they are not accuracy.")
     table = pd.DataFrame([state_to_row(s) for s in states])
     a, b = st.columns(2)
     a.download_button("⬇️ Results (CSV)", table.to_csv(index=False).encode("utf-8-sig"), "analysis_results.csv", "text/csv",
@@ -205,29 +209,117 @@ def _step_run(c, ref: pd.DataFrame, labels: dict):
 # --------------------------------------------------------------------------- #
 # Results
 # --------------------------------------------------------------------------- #
+# Headline metrics: one line per agent, the numbers the research reports first
+HEADLINE = {
+    "Agent1": [("Sentiment", "sentiment", "macro_f1", "Macro F1"), ("Feedback type", "feedback_type", "macro_f1", "Macro F1"),
+               ("EGSQUAL dimension", "dimensions", "macro_f1", "Macro F1")],
+    "Agent2": [("Severity", "severity", "accuracy", "Accuracy"), ("Priority", "priority", "accuracy", "Accuracy"),
+               ("Priority error", "priority", "mae", "MAE (lower is better)")],
+    "Agent3": [("Actionability", "ticket", "accuracy", "Accuracy"), ("Routing", "handling_team", "accuracy", "Accuracy"),
+               ("Escalation", "escalation", "accuracy", "Accuracy")],
+}
+AGENT_TITLE = {"Agent1": "Agent 1 — Feedback Analysis", "Agent2": "Agent 2 — Impact & Priority",
+               "Agent3": "Agent 3 — Resolution & Escalation"}
+
+
 def _results(run: E.EvalRun, labels: dict) -> None:
     sys_keys = list(run.results)
-    st.caption(f"Reasoning engine for this run: **{run.engine}** · predictions: "
-               + ", ".join(f"{E.SYSTEMS[s]} {len(run.results[s])}" for s in sys_keys))
-    show = st.segmented_control("Agent-level metrics for", sys_keys, default="multi_agent" if "multi_agent" in sys_keys else sys_keys[0],
-                                format_func=E.SYSTEMS.get, key="evd_show") or sys_keys[0]
-    preds = run.results[show]
-    if show != "multi_agent":
-        st.caption("Baselines have no separate agents; their outputs are scored on the same fields for comparison.")
+    main = "multi_agent" if "multi_agent" in sys_keys else sys_keys[0]
+    preds = run.results[main]
+    C.section("3 · Results", f"{len(labels)} labelled review(s) · engine: {run.engine}")
     failed = sum(p.failed for p in preds)
     if failed:
-        st.error(f"⛔ {failed} of {len(preds)} review(s) produced no output for {E.SYSTEMS[show]} — counted as wrong "
-                 "predictions (FAILED), not removed. First error: " + next(p.error for p in preds if p.failed)[:200])
+        st.error(f"⛔ {failed} of {len(preds)} review(s) produced no output — counted as wrong, not removed.")
     fb = sum(p.used_fallback for p in preds)
     if fb:
-        st.warning(f"{fb} review(s) used the rule-based fallback for at least one LLM step.")
+        st.warning(f"{fb} review(s) used the rule-based fallback (no LLM credit or an LLM error).")
+    _glance(run, labels, main)
+    _versus(run, labels)
+    st.write("")
+    st.markdown("##### Details")
+    t0, t1, t2, t3, t4, t5 = st.tabs(["📋 Summary table (3.5)", "Agent 1", "Agent 2", "Agent 3", "Time & cost", "Statistical tests"])
+    with t0:
+        _plan_summary(run, labels)
+    show = main
+    if len(sys_keys) > 1:
+        with t1:
+            show = st.segmented_control("Agent details for", sys_keys, default=main, format_func=E.SYSTEMS.get,
+                                        key="evd_show") or main
+    dp = run.results[show]
+    with t1:
+        _agent1(dp, labels)
+    with t2:
+        _agent2(dp, labels)
+    with t3:
+        _agent3(dp, labels)
+    with t4:
+        _overall(run, labels)
+    with t5:
+        _proof(run, labels)
 
-    _plan_summary(run, labels)
-    _agent1(preds, labels)
-    _agent2(preds, labels)
-    _agent3(preds, labels)
-    _overall(run, labels)
-    _proof(run, labels)
+
+def _glance(run: E.EvalRun, labels: dict, main: str) -> None:
+    """Three cards, one per agent, with the three numbers that matter most."""
+    preds = run.results[main]
+    cols = st.columns(3)
+    for col, (ag, items) in zip(cols, HEADLINE.items()):
+        color = A_COLORS[ag]
+        rows = ""
+        for name, f, metric, sub in items:
+            v = E.plan_metric(labels, preds, f, metric)
+            val = _f(v, ".2f" if metric == "mae" else ".0%" if metric == "accuracy" else ".2f")
+            rows += (f'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;'
+                     f'border-top:1px solid #EDF3EF"><div><div style="font-weight:600">{name}</div>'
+                     f'<div class="small">{sub}</div></div>'
+                     f'<div style="font-size:1.7rem;font-weight:800;color:{color if v is not None else "#9AA8A1"}">{val}</div></div>')
+        with col:
+            C.md(f'<div class="kpi" style="border-top:6px solid {color};padding:14px 16px">'
+                 f'<div style="font-weight:700;color:{color};margin-bottom:4px">{AGENT_TITLE[ag]}</div>{rows}</div>')
+    st.caption(f"{E.SYSTEMS[main]} · n/a = no reference labels for that field (nothing is estimated).")
+
+
+VERSUS = [("Sentiment", "sentiment", "macro_f1"), ("Feedback type", "feedback_type", "macro_f1"),
+          ("EGSQUAL dimension", "dimensions", "macro_f1"), ("Severity", "severity", "accuracy"),
+          ("Priority", "priority", "accuracy"), ("Actionability", "ticket", "accuracy"), ("Escalation", "escalation", "accuracy")]
+
+
+def _versus(run: E.EvalRun, labels: dict) -> None:
+    """Proposed framework vs. baselines on the same headline metrics, with a one-line verdict."""
+    with st.container(border=True):
+        st.markdown("**Multi-agent framework vs. baselines** (higher is better)")
+        if len(run.results) < 2 or "multi_agent" not in run.results:
+            st.caption("Only one system was run. Select Single LLM and Sequential in step 2 (needs a working LLM) to compare.")
+            return
+        rows = []
+        for name, f, m in VERSUS:
+            for sk, preds in run.results.items():
+                v = E.plan_metric(labels, preds, f, m)
+                if v is not None:
+                    rows.append({"metric": name, "system_key": sk, "system": E.SYSTEMS[sk], "value": float(v)})
+        long = pd.DataFrame(rows)
+        if long.empty:
+            st.caption("No labelled fields to compare.")
+            return
+        wins = ties = total = 0
+        for name, g in long.groupby("metric", sort=False):
+            if "multi_agent" not in set(g["system_key"]) or len(g) < 2:
+                continue
+            total += 1
+            ma = g[g["system_key"] == "multi_agent"]["value"].iloc[0]
+            best_other = g[g["system_key"] != "multi_agent"]["value"].max()
+            wins += ma > best_other + 1e-9
+            ties += abs(ma - best_other) <= 1e-9
+        if total:
+            st.markdown(f"The multi-agent framework is **best on {wins} of {total}** metric(s)"
+                        + (f", tied on {ties}" if ties else "") + f", and behind on {total - wins - ties}. "
+                        "See *Statistical tests* for whether the differences are significant.")
+        wide = long.pivot_table(index="metric", columns="system", values="value", sort=False)
+        wide = wide[[E.SYSTEMS[k] for k in run.results if E.SYSTEMS[k] in wide.columns]]
+        wide.index.name = None
+        st.dataframe(wide.style.format("{:.2f}", na_rep="n/a")
+                     .highlight_max(axis=1, props="font-weight:700;background-color:#DDF3E8;color:#0B3D2E"),
+                     width="stretch")
+        st.caption("Green cell = best system for that metric. Sentiment, feedback type and EGSQUAL use Macro F1; the others use accuracy.")
 
 
 def _plan_summary(run: E.EvalRun, labels: dict) -> None:
@@ -425,7 +517,7 @@ def _proof(run: E.EvalRun, labels: dict) -> None:
     reviews = st.session_state.get("evd_reviews") or {}
     colors = E.SYSTEM_COLORS
     tab = E.overall_table(labels, run.results, run.prices, reviews)
-    with st.expander("🧪 Advanced: statistical tests, reliability and hard cases", expanded=False), st.container(key="frame_Overall_proof"):
+    with st.container(key="frame_Overall_proof"):
         C.md('<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">'
              '<span class="agent-tag" style="background:#0E3B2C;font-size:0.8rem;padding:4px 10px">EVIDENCE</span>'
              '<span class="agent-title" style="font-size:1.15rem">🧪 Is the framework better? — statistical evidence</span>'
@@ -499,8 +591,7 @@ def _proof(run: E.EvalRun, labels: dict) -> None:
                 sub["subgroup"] = sub["subgroup"] + " (n=" + sub["n"].astype(str) + ")"
                 st.altair_chart(CH.faceted_system_bars(sub, "subgroup", "mean_accuracy", colors, "Mean accuracy"),
                                 key="evd_pf_sub")
-                with st.expander("Subgroup table"):
-                    st.dataframe(sub.drop(columns=["system_key"]), hide_index=True, width="stretch")
+                st.dataframe(sub.drop(columns=["system_key"]), hide_index=True, width="stretch")
 
 
 def _metrics_json(run: E.EvalRun, labels: dict) -> dict:

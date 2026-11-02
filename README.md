@@ -131,7 +131,10 @@ to exist verbatim in the dataset (checked by `run_scenarios.py`).
 | `ui/components.py` | Reusable components: KPI cards, severity/priority badges, workflow diagram, evidence highlighting, issue and assessment cards, message timeline, escalation checklist, ticket |
 | `ui/charts.py` | Altair charts (categories, EGSQUAL dimensions, priority, severity, severity-by-rating, checks, P/R/F1) |
 | `ui/result_view.py` | The multi-agent result screen: live run, workflow diagram, three agent panels, communication and log, JSON export |
-| `ui/pages.py` | Pages: Dashboard, Analyse feedback (including the test scenarios), Methodology & rules |
+| `ui/pages.py` | Pages: Dashboard, Analyse feedback (including the test scenarios), Service Quality Insights, Methodology & rules |
+| `insights.py` | Counts, groupings and rule-based recommendations shared by the Service Quality Insights page and the PDF |
+| `report_pdf.py` | Executive PDF report (fpdf2; Arabic shaped with HarfBuzz and set right-to-left; bundled DejaVu Sans in `assets/fonts`) |
+| `knowledge_base/egsqual_reference.json` | EGSQUAL citation (Aljukhadar et al., 2022), verification status, provisional crosswalk, adaptation and limitations |
 | `.streamlit/config.toml` | Light navy/teal theme for presentations |
 | `agents/agent1.py` | Feedback Investigation Agent |
 | `agents/agent2.py` | Impact Assessment & Prioritization Agent |
@@ -317,6 +320,7 @@ Launch with `streamlit run app.py` and open <http://localhost:8501>.
 |---|---|
 | **Dashboard** | Dataset KPIs, then **Run sample analysis** to get KPIs and interactive charts grouped by agent: issues, feedback categories, EGSQUAL dimensions, severity, priority, *severity vs star rating*, actions and escalation status. Everything is computed only from reviews actually analysed in the session; the results download as CSV. |
 | **Analyse feedback** | Type a review, load an example or a test scenario (S6 shows a real Agent 2 → Agent 1 revision; S8, synthetic, shows an escalation candidate awaiting human approval), or pick one from the dataset. The pipeline shows the active agent live; the result shows the final decision, the workflow diagram and one tab per agent plus the communication log. |
+| **Service Quality Insights** | Executive view built only from analysed results: top affected service-quality dimensions (with the provisional EGSQUAL dimension), most frequent issues with Arabic evidence, P1/P2 feedback, Agent 3's improvement actions and management recommendations. **Generate Executive Report** builds a 10-section PDF (disabled until something has been analysed). |
 | **Evaluation** | Upload the reference labels, run the systems, and read per-agent P/R/Macro F1, ticket and escalation F1, JSON validity, and the Multi-Agent vs Single LLM vs Sequential pipeline comparison (Macro F1, Escalation F1, time, estimated cost). Statistical tests are in a collapsed *Advanced* section. |
 | **Methodology & rules** | EGSQUAL definitions, the R1–R4 / P-rules and the E1–E5 escalation rules. |
 

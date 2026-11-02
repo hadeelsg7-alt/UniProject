@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 
 import heuristics
+import lexicon as lx
 from agents.base import BaseAgent
 from schemas import (
     Agent1Output, AgentMessage, AnalysisStatus, Issue, LLMAgent1Analysis, LLMIssue,
@@ -30,9 +31,11 @@ Your job:
 2. Choose the primary feedback type: Bug, Suggestion, Inquiry, Praise, or General Complaint (and secondary types).
 3. Extract every INDEPENDENT issue separately (one problem per issue). Do not merge different problems,
    and do not split one problem into several.
-4. For each issue: short English description, issue_type, EGSQUAL dimension (use ONLY the provided keys),
+4. For each issue: short English description, issue_type, service-quality dimension (use ONLY the provided keys),
+   a one-sentence dimension_reason naming the words in the evidence that justify the dimension,
    an evidence_quote copied EXACTLY (verbatim substring) from the review, the affected service/feature
-   (or 'unspecified'), and any missing information needed to act.
+   (or 'unspecified'), and any missing information needed to act. Use UNMAPPED when the evidence does not
+   show which aspect of the service failed; never guess a dimension.
 5. Flag the review as ambiguous when it does not say what failed, is too short, or is global/unspecific.
 6. Never invent facts that are not in the text. Praise alone is not an issue.
 Return only the requested structured output."""
@@ -109,6 +112,8 @@ Return only the requested structured output."""
             missing = sorted(set(missing + amb["missing_information"]))
 
         if is_amb:
+            self._unmap_unspecific(state, issues)
+        if is_amb:
             status = AnalysisStatus.NEEDS_CLARIFICATION
             why = "Feedback is ambiguous/incomplete: " + "; ".join(reasons)
         elif self_revisions:
@@ -130,12 +135,14 @@ Return only the requested structured output."""
         kb = self.call_tool(state, "egsqual_kb_lookup", f"Look up definition of dimension {li.dimension} for {issue_id}",
                             dimension_key=li.dimension)
         dim = li.dimension
+        corrected = False
         if not kb["found"]:
             sug = self.call_tool(state, "egsqual_kb_search", f"Dimension '{li.dimension}' not in KB - search by evidence keywords",
                                  text=li.evidence_quote)
             dim = sug["best_dimension"]
             kb = self.call_tool(state, "egsqual_kb_lookup", f"Look up suggested dimension {dim}", dimension_key=dim)
             self_revisions.append(f"{issue_id}: dimension corrected to {dim}")
+            corrected = True
 
         evidence = li.evidence_quote
         ver = self.call_tool(state, "evidence_verifier", f"Verify evidence for {issue_id} is in the original review",
@@ -154,12 +161,45 @@ Return only the requested structured output."""
                 state.log(self.name, "REJECT_ISSUE", f"{issue_id} ('{li.description}') rejected: no supporting evidence in the review")
                 self_revisions.append(f"{issue_id}: rejected as unsupported")
                 return None
+        reason = self._dimension_reason(state, li, dim, kb.get("name", dim), evidence, topic, corrected)
         return Issue(
             issue_id=issue_id, description=li.description, issue_type=li.issue_type, topic=topic, dimension=dim,
-            dimension_name=kb.get("name", dim), dimension_definition=kb.get("definition", ""), evidence=evidence,
+            dimension_name=kb.get("name", dim), dimension_definition=kb.get("definition", ""),
+            dimension_reason=reason, egsqual_candidate=kb.get("egsqual_candidate"), evidence=evidence,
             evidence_verified=ver["verified"], evidence_score=ver["score"], affected_service=li.affected_service or "unspecified",
             missing_information=list(li.missing_information), confidence=li.confidence,
         )
+
+    def _dimension_reason(self, state, li: LLMIssue, dim: str, name: str, evidence: str, topic: str, corrected: bool) -> str:
+        """Explain the dimension: the LLM's own reason, else the knowledge-base keywords found in the evidence."""
+        if li.dimension_reason.strip() and not corrected:
+            return li.dimension_reason.strip()
+        if dim == "UNMAPPED":
+            return "The evidence does not say which feature or step failed, so no service-quality dimension is assigned."
+        hits = self.call_tool(state, "egsqual_kb_search", f"Find the evidence words that support dimension {dim}",
+                              text=evidence)["matched"].get(dim, [])
+        prefix = "Corrected by the knowledge-base keyword search. " if corrected else ""
+        if hits:
+            words = "», «".join(dict.fromkeys(hits))
+            return f"{prefix}The evidence contains «{words}», listed under {name} in the knowledge base."
+        label = lx.TOPICS.get(topic, lx.GENERIC_TOPIC).label_en
+        return f"{prefix}Assigned from the issue type ({li.issue_type}) and topic ({label}); no {name} keyword appears in the evidence."
+
+    def _unmap_unspecific(self, state, issues: list[Issue]) -> None:
+        """Ambiguous review + generic malfunction + no dimension keyword: mark the issue UNMAPPED instead of guessing."""
+        kb = None
+        for i in issues:
+            if i.dimension == "UNMAPPED" or i.topic != lx.GENERIC_TOPIC.key:
+                continue
+            if any(self.call_tool(state, "egsqual_kb_search", f"Check {i.issue_id} for any dimension keyword",
+                                  text=i.evidence)["scores"].values()):
+                continue
+            kb = kb or self.call_tool(state, "egsqual_kb_lookup", "Look up the Unclear / Unmapped category", dimension_key="UNMAPPED")
+            i.dimension, i.dimension_name, i.dimension_definition = "UNMAPPED", kb["name"], kb["definition"]
+            i.egsqual_candidate = None
+            i.dimension_reason = ("The review is unspecific and the evidence names no feature or step, "
+                                  "so the issue is left Unclear / Unmapped rather than guessed.")
+            state.log(self.name, "DECISION", f"{i.issue_id}: dimension set to UNMAPPED (unspecific evidence)")
 
     # ------------------------------------------------------------------ #
     # Inter-agent: respond to Agent 2's review requests

@@ -71,6 +71,7 @@ SLA_REFERENCE_DATE: date | None = date.fromisoformat(_ref) if _ref else None
 # Knowledge-base / rule files (editable without touching code)
 # --------------------------------------------------------------------------- #
 EGSQUAL_KB_PATH = KB_DIR / "egsqual_dimensions.json"
+EGSQUAL_REFERENCE_PATH = KB_DIR / "egsqual_reference.json"
 DIALECT_LEXICON_PATH = KB_DIR / "saudi_dialect_lexicon.json"
 ESCALATION_RULES_PATH = KB_DIR / "escalation_rules.json"
 COMPLAINT_HISTORY_PATH = KB_DIR / "complaint_history_synthetic.json"

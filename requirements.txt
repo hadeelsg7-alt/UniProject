@@ -8,3 +8,6 @@ openai>=3.29         # optional alternative provider: responses.parse structured
 tabulate>=0.9        # markdown tables in the scenario report
 pytest>=8.0
 openpyxl>=3.1         # Excel review workbook for reference labels
+fpdf2>=2.8           # executive PDF report
+uharfbuzz>=0.39      # Arabic shaping / right-to-left text in the PDF
+pypdf>=4.0           # tests: read back the generated PDF

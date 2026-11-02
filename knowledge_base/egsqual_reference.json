@@ -1,0 +1,57 @@
+{
+  "_about": "Reference record for the EGSQUAL scale and the verification status of what the prototype uses from it. Edit this file after reading the full paper; the Methodology page and the executive report read it directly.",
+  "citation": {
+    "authors": "Aljukhadar, M., et al.",
+    "authors_note": "Full author list not verified: the publisher page could not be opened from the development environment.",
+    "year": 2022,
+    "title": "Measuring the service quality of governmental sites: Development and validation of the e-Government service quality (EGSQUAL) scale",
+    "journal": "Electronic Commerce Research and Applications",
+    "volume": "55",
+    "article": "101182",
+    "doi": "10.1016/j.elerap.2022.101182",
+    "doi_url": "https://doi.org/10.1016/j.elerap.2022.101182",
+    "article_url": "https://www.sciencedirect.com/science/article/abs/pii/S1567422322000667"
+  },
+  "verification": {
+    "date": "2026-11-02",
+    "full_text_accessed": false,
+    "method": "The ScienceDirect, ACM Digital Library and ResearchGate pages could not be opened from the development environment (network policy). Only a web-search summary of the authors' abstract and highlights was available.",
+    "verified_from_search_summary": [
+      "Journal, volume 55, article 101182, year 2022",
+      "The scale has 21 items developed and validated in an eleven-step procedure, with input from academics and experts",
+      "Seven dimension NAMES: interactivity and personalization, information quality, quality of assistance, ease of use, website functionality, privacy and security, aesthetics"
+    ],
+    "not_verified": [
+      "The definition of every dimension (none is quoted here, to avoid guessing)",
+      "The 21 item wordings and which items load on which dimension",
+      "The exact author list",
+      "The sample, country and validation statistics",
+      "The exact wording of the dimension names (taken from a search summary, not the paper)"
+    ],
+    "conflicting_secondary_source": "One secondary review lists the seven dimensions differently (interface, information, aesthetics, usability, security, reliability, support). The authors' abstract is treated as authoritative until the full text is checked.",
+    "action_needed": "Provide the PDF of the paper (or allow sciencedirect.com in the session's network settings) so the definitions and the crosswalk can be verified."
+  },
+  "egsqual_dimensions": [
+    {"name": "Interactivity and personalization", "name_status": "reported in abstract (search summary)", "definition_status": "not verified", "prototype_categories": []},
+    {"name": "Information quality", "name_status": "reported in abstract (search summary)", "definition_status": "not verified", "prototype_categories": ["INFORMATION_QUALITY"]},
+    {"name": "Quality of assistance", "name_status": "reported in abstract (search summary)", "definition_status": "not verified", "prototype_categories": ["RESPONSIVENESS", "CONTACT"]},
+    {"name": "Ease of use", "name_status": "reported in abstract (search summary)", "definition_status": "not verified", "prototype_categories": ["EFFICIENCY"]},
+    {"name": "Website functionality", "name_status": "reported in abstract (search summary)", "definition_status": "not verified", "prototype_categories": ["SYSTEM_AVAILABILITY", "FULFILLMENT"]},
+    {"name": "Privacy and security", "name_status": "reported in abstract (search summary)", "definition_status": "not verified", "prototype_categories": ["PRIVACY_SECURITY"]},
+    {"name": "Aesthetics", "name_status": "reported in abstract (search summary)", "definition_status": "not verified", "prototype_categories": []}
+  ],
+  "crosswalk_status": "PROVISIONAL: matched by dimension name and concept only. Re-check every row against the paper's definitions and items.",
+  "adaptation": [
+    "EGSQUAL is a survey scale for measuring perceived service quality of governmental WEBSITES. It was not designed to classify free-text feedback or mobile-app reviews.",
+    "This prototype uses service-quality dimensions as a qualitative coding frame: each issue extracted from an Arabic review is assigned one operational category, which carries a provisional EGSQUAL dimension.",
+    "The operational categories come from E-S-QUAL / E-RecS-QUAL and e-GovQual, which describe failure-oriented aspects (availability, fulfilment, responsiveness) that app reviews mention often.",
+    "An 'Unclear / Unmapped' category is used when the evidence does not show which aspect of the service failed."
+  ],
+  "limitations": [
+    "The dimension definitions and the crosswalk are unverified until the full paper is read.",
+    "Two EGSQUAL dimensions (interactivity and personalization; aesthetics) have no operational category yet, so feedback about them is classified under the nearest category (usually Efficiency).",
+    "EGSQUAL was validated for websites; mobile apps add issues (crashes, updates, device compatibility) that the scale may not cover.",
+    "Short, dialectal Arabic reviews often lack enough detail to identify a dimension, hence the Unmapped category.",
+    "No inter-annotator agreement has yet been measured for the dimension coding."
+  ]
+}

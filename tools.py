@@ -29,6 +29,11 @@ def _load_json(path: str) -> dict:
         return json.load(fh)
 
 
+def egsqual_reference() -> dict:
+    """Citation, verification status and crosswalk for the EGSQUAL scale (Aljukhadar et al., 2022)."""
+    return _load_json(str(config.EGSQUAL_REFERENCE_PATH))
+
+
 def egsqual_kb() -> dict:
     return _load_json(str(config.EGSQUAL_KB_PATH))["dimensions"]
 
@@ -74,7 +79,8 @@ def egsqual_kb_lookup(dimension_key: str) -> dict:
         return {"found": True, "dimensions": {k: {"name": d["name_en"], "definition": d["definition"]} for k, d in kb.items()}}
     if key in kb:
         d = kb[key]
-        return {"found": True, "key": key, "name": d["name_en"], "name_ar": d["name_ar"], "definition": d["definition"], "source": d["source"]}
+        return {"found": True, "key": key, "name": d["name_en"], "name_ar": d["name_ar"], "definition": d["definition"],
+                "source": d["source"], "egsqual_candidate": d.get("egsqual_candidate")}
     return {"found": False, "key": key, "valid_keys": list(kb)}
 
 
@@ -82,15 +88,17 @@ def egsqual_kb_search(text: str) -> dict:
     """Suggest the best-matching EGSQUAL dimension for a text span using the
     keywords stored in the knowledge base (used when a dimension is invalid)."""
     kb = egsqual_kb()
-    scores = {}
+    scores, matched = {}, {}
     nc = normalize_with_map(text)
     for key, d in kb.items():
         kws = [normalize(k) for k in d.get("keywords_ar", [])]
-        scores[key] = len(find_cues(text, kws, nc))
+        hits = find_cues(text, kws, nc)
+        scores[key] = len(hits)
+        matched[key] = [text[h.start:h.end] for h in hits]
     best = max(scores, key=lambda k: scores[k])
     if scores[best] == 0:
-        best = "SYSTEM_AVAILABILITY"
-    return {"best_dimension": best, "scores": scores}
+        best = "UNMAPPED"  # no keyword evidence for any dimension: do not guess
+    return {"best_dimension": best, "scores": scores, "matched": matched}
 
 
 def evidence_verifier(review_text: str, evidence: str) -> dict:

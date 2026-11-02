@@ -27,6 +27,7 @@ DimensionLit = Literal[
     "RESPONSIVENESS",
     "CONTACT",
     "INFORMATION_QUALITY",
+    "UNMAPPED",  # evidence does not show which aspect of the service failed
 ]
 ServiceCompletionLit = Literal["BLOCKED", "PARTIALLY_BLOCKED", "DEGRADED", "NOT_AFFECTED"]
 ScopeLit = Literal["INDIVIDUAL", "RECURRING", "WIDESPREAD"]
@@ -99,6 +100,8 @@ class LLMIssue(BaseModel):
     description: str = Field(description="Short English description of ONE independent issue")
     issue_type: FeedbackTypeLit
     dimension: DimensionLit
+    dimension_reason: str = Field(default="", description="One sentence: which words in the evidence justify this dimension "
+                                  "(use UNMAPPED when the evidence does not show which aspect of the service failed)")
     evidence_quote: str = Field(description="Exact span copied from the original Arabic review")
     affected_service: str = Field(description="Service/feature affected, or 'unspecified'")
     missing_information: list[str] = Field(default_factory=list)
@@ -185,6 +188,8 @@ class Issue(BaseModel):
     dimension: str
     dimension_name: str = ""
     dimension_definition: str = ""
+    dimension_reason: str = ""        # why this dimension was assigned
+    egsqual_candidate: Optional[str] = None  # provisional EGSQUAL (Aljukhadar et al., 2022) dimension
     evidence: str
     evidence_verified: bool = False
     evidence_score: float = 0.0

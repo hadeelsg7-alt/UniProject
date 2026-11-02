@@ -294,22 +294,191 @@ def page_analyze() -> None:
 
 
 # =========================================================================== #
-# 3. Methodology & rules
+# 3. Service Quality Insights (executive dashboard + PDF report)
 # =========================================================================== #
+def _rtl_table(df: pd.DataFrame, rtl_cols: tuple[str, ...]) -> None:
+    """HTML table: Arabic evidence columns are set right-to-left; everything is escaped."""
+    head = "".join(f"<th>{C.esc(str(c))}</th>" for c in df.columns)
+    body = "".join("<tr>" + "".join(
+        f'<td class="rtl">{C.esc(str(v))}</td>' if c in rtl_cols else f"<td>{C.esc(str(v))}</td>" for c, v in row.items()) + "</tr>"
+        for _, row in df.iterrows())
+    C.md(f'<div class="ins-table"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>')
+
+
+def page_insights() -> None:
+    import insights as INS
+    import report_pdf
+
+    C.hero("Service Quality Insights", "Executive view of the analysed beneficiary feedback: affected service-quality dimensions, "
+           "frequent issues, urgent feedback and Agent 3's recommended improvements.", [INS.PROTOTYPE_LABEL])
+    states = [s for s in store().values() if s.agent3 is not None]
+    ins = INS.compute_insights(states)
+    cov = ins["coverage"]
+
+    with st.container(border=True):
+        a, b = st.columns([3, 2])
+        a.markdown("**Executive report (PDF)** · 10 sections, dark-green identity, Arabic evidence right-to-left, "
+                   "built only from the results below.")
+        if not states:
+            a.caption("Disabled: no reviews have been analysed in this session yet. Run a sample on the Dashboard "
+                      "or analyse a review first; the report never uses invented figures.")
+        if b.button("📄 Generate Executive Report", type="primary", disabled=not states, width="stretch", key="ins_gen"):
+            with st.spinner("Building the PDF…"):
+                st.session_state["ins_pdf"] = (report_pdf.build_executive_report(ins), cov["reviews"], cov["analysis_date"])
+        pdf = st.session_state.get("ins_pdf")
+        if pdf and states:
+            data, n, day = pdf
+            if n != cov["reviews"]:
+                b.caption(f"⚠️ This PDF covers {n} reviews; {cov['reviews']} are analysed now. Generate it again to include them.")
+            b.download_button("⬇️ Download the PDF", data, f"executive_report_{day}.pdf", "application/pdf",
+                              width="stretch", key="ins_dl")
+
+    if not states:
+        C.empty_state("📊", "No analysed feedback yet", "Every number on this page is computed from reviews actually analysed "
+                      "in this session. Run a sample on the Dashboard or analyse a review first.")
+        return
+
+    urgent = sum(n for p, n, _ in ins["priority"] if p in INS.URGENT)
+    hc = sum(n for s_, n, _ in ins["severity"] if s_ in ("High", "Critical"))
+    C.kpi_row([("Reviews analysed", cov["reviews"], f"{cov['apps']} application(s)", "navy"),
+               ("Service issues", cov["issues"], "evidence-backed"),
+               ("High / Critical", hc, "service blocked or disrupted", "crit" if hc else ""),
+               ("P1 / P2", urgent, "require attention first", "warn" if urgent else "")])
+    C.section("Executive summary", "sentences built only from the counts below")
+    for line in ins["summary"]:
+        st.markdown(f"- {line}")
+
+    C.section("Top affected service-quality dimensions", "with the provisional EGSQUAL dimension (Aljukhadar et al., 2022)")
+    if ins["dimensions"]:
+        g1, g2 = st.columns([2, 3])
+        with g1, st.container(border=True):
+            dims = pd.Series([d["name"].split(" (")[0] for d in ins["dimensions"] for _ in range(d["issues"])])
+            st.altair_chart(CH.single_hue_bars(dims, T.TEAL, "Issues"), width="stretch")
+        with g2:
+            st.dataframe(pd.DataFrame([{"dimension": d["name"], "EGSQUAL (provisional)": d["egsqual"] or "—", "issues": d["issues"],
+                                        "share %": d["share"], "High/Critical": d["high_critical"], "P1/P2": d["urgent"],
+                                        "most affected app": f"{d['top_apps'][0][0]} ({d['top_apps'][0][1]})" if d["top_apps"] else "—"}
+                                       for d in ins["dimensions"]]), hide_index=True, width="stretch")
+    else:
+        st.caption("No operational issue was extracted.")
+
+    C.section("Most frequently reported issues", "grouped by topic and dimension · verbatim evidence")
+    if ins["top_issues"]:
+        _rtl_table(pd.DataFrame([{"Issue": t["issue"], "Dimension": t["dimension"], "Issues": t["count"], "P1/P2": t["urgent"],
+                                  "Example evidence": t["examples"][0]["evidence"] if t["examples"] else "",
+                                  "Review": t["examples"][0]["review_id"] if t["examples"] else ""} for t in ins["top_issues"]]),
+                   ("Example evidence",))
+    else:
+        st.caption("No operational issue was extracted.")
+
+    C.section("High-priority feedback requiring attention", f"{len(ins['high_priority'])} issue(s) with priority P1 or P2")
+    if ins["high_priority"]:
+        _rtl_table(pd.DataFrame([{"Priority": r["priority"], "Severity": r["severity"], "Application": r["app"],
+                                  "Issue": r["description"], "Evidence": r["evidence"], "Review": r["review_id"]}
+                                 for r in ins["high_priority"][:25]]), ("Evidence",))
+        if len(ins["high_priority"]) > 25:
+            st.caption(f"Showing 25 of {len(ins['high_priority'])}; the full list is in the Dashboard CSV export.")
+    else:
+        st.caption("No P1/P2 issue in the analysed feedback.")
+
+    C.section("Recommended service improvements", "from Agent 3's decisions; recommendations state their basis")
+    a, b = st.columns([2, 3])
+    with a, st.container(border=True):
+        st.markdown("**Agent 3 actions** (reviews)")
+        st.dataframe(pd.DataFrame(ins["actions"], columns=["action", "reviews", "share %"]), hide_index=True, width="stretch")
+    with b, st.container(border=True):
+        st.markdown("**Management recommendations**")
+        for k, r in enumerate(ins["recommendations"], start=1):
+            st.markdown(f"**{k}. {r['title']}**  \n{r['basis']}")
+    if ins["improvements"]:
+        st.dataframe(pd.DataFrame([{"action": g["action"], "application": g["app"], "dimension": g["dimension"],
+                                    "tickets": g["tickets"], "P1/P2": g["urgent"], "example ticket": g["example_title"]}
+                                   for g in ins["improvements"]]), hide_index=True, width="stretch")
+    st.caption("🛡️ Tickets and escalations are simulated; escalation rules are research-defined. Nothing is sent to any government system.")
+
+
+# =========================================================================== #
+# 4. Methodology & rules
+# =========================================================================== #
+def _egsqual_section() -> None:
+    """EGSQUAL subsection: reference, verification status, crosswalk, Arabic examples, mapping rules, limitations."""
+    kb, ref = tools.egsqual_kb(), tools.egsqual_reference()
+    cit, ver = ref["citation"], ref["verification"]
+    C.section("EGSQUAL — service-quality dimensions (Agent 1)", "primary reference and how it is used")
+    C.md(f'<div class="card"><h4>Primary reference</h4><div>{C.esc(cit["authors"])} ({cit["year"]}). <i>{C.esc(cit["title"])}</i>. '
+         f'{C.esc(cit["journal"])}, {C.esc(cit["volume"])}, {C.esc(cit["article"])}. '
+         f'DOI: <a href="{C.esc(cit["doi_url"])}" target="_blank">{C.esc(cit["doi"])}</a></div>'
+         f'<div class="small" style="margin-top:6px">{C.esc(cit["authors_note"])}</div></div>')
+    if not ver["full_text_accessed"]:
+        st.warning("**Verification status: full text NOT accessed.** " + ver["method"] + "  \n**Action needed:** " + ver["action_needed"])
+    a, b = st.columns(2)
+    with a:
+        st.markdown("**Verified (from the authors' abstract, via search summary)**")
+        for x in ver["verified_from_search_summary"]:
+            st.markdown(f"- {x}")
+    with b:
+        st.markdown("**Not verified — not used as fact**")
+        for x in ver["not_verified"]:
+            st.markdown(f"- {x}")
+    st.markdown("**The seven EGSQUAL dimensions and the prototype's categories (provisional crosswalk)**")
+    st.dataframe(pd.DataFrame([{"EGSQUAL dimension": d["name"], "name status": d["name_status"], "definition": d["definition_status"],
+                                "prototype categories": ", ".join(kb[k]["name_en"] for k in d["prototype_categories"]) or "— none yet"}
+                               for d in ref["egsqual_dimensions"]]), hide_index=True, width="stretch")
+    st.caption(ref["crosswalk_status"])
+
+    st.markdown("**Operational categories used by Agent 1**")
+    st.dataframe(pd.DataFrame([{"key": k, "category": v["name_en"], "arabic": v["name_ar"], "definition": v["definition"],
+                                "EGSQUAL (provisional)": v.get("egsqual_candidate") or "—", "source": v["source"]}
+                               for k, v in kb.items()]), hide_index=True, width="stretch")
+    with st.expander("Arabic feedback examples for each category (real reviews from the research dataset)"):
+        for k, v in kb.items():
+            for e in v.get("examples_ar", []):
+                C.md(f'<div class="small" style="margin-top:8px"><b>{C.esc(v["name_en"])}</b> · {C.esc(e["review_id"])} · {C.esc(e["app_id"])}</div>'
+                     f'<div class="review-box"><div class="rtl">{C.esc(e["text"])}</div></div>')
+
+    st.markdown("**Mapping rules used by Agent 1**")
+    for x in [
+        "Each review is split into independent issues; every issue gets exactly one category, so a review with several issues "
+        "can carry several dimensions.",
+        "In LLM mode, the model receives the category definitions from the knowledge base and must return a category key, a "
+        "one-sentence reason and a verbatim Arabic evidence quote. In offline mode, the topic lexicon assigns the category.",
+        "The evidence verifier checks that the quote occurs in the review; an issue without supporting evidence is rejected.",
+        "A category key that does not exist is corrected by the knowledge-base keyword search; if no keyword matches, the issue "
+        "is set to Unclear / Unmapped instead of being guessed.",
+        "When the review is ambiguous and the issue is a generic malfunction with no category keyword in its evidence, the "
+        "issue is set to Unclear / Unmapped.",
+        "Each issue shows its category, the provisional EGSQUAL dimension, the Arabic evidence and the reason for the choice.",
+    ]:
+        st.markdown(f"- {x}")
+    st.markdown("**How the dimensions are used by Agents 2 and 3**")
+    for x in [
+        "Agent 2 receives each issue's category as context, but severity and priority are set only by rules R1–R4 and the "
+        "P-rules from impact facts; a category never raises or lowers severity.",
+        "Agent 1's duplicate check treats two issues as the same problem only when they share a category.",
+        "Agent 3 writes the categories into the simulated ticket so it can be routed to the owner of that service aspect; the "
+        "action itself depends on the issue type and whether the service could be completed.",
+        "The Service Quality Insights page and the executive report aggregate issues, severity and priority by category.",
+    ]:
+        st.markdown(f"- {x}")
+    st.markdown("**Adaptation of EGSQUAL**")
+    for x in ref["adaptation"]:
+        st.markdown(f"- {x}")
+    st.markdown("**Limitations**")
+    for x in ref["limitations"]:
+        st.markdown(f"- {x}")
+
+
 def page_methodology() -> None:
     C.hero("Methodology & Rules", "How the framework decides — every rule below is editable in knowledge_base/ without code changes.",
            ["Proposed research rules", "Not official DGA rules"])
     C.md('<div class="card"><h4>Architecture</h4><div class="small">'
-         '<b>Agent 1</b> extracts independent issues with verbatim evidence, maps them to EGSQUAL via the knowledge-base tool, '
+         '<b>Agent 1</b> extracts independent issues with verbatim evidence, maps each to a service-quality category (with a provisional EGSQUAL dimension) via the knowledge-base tool, '
          'self-verifies and flags ambiguity. <b>Agent 2</b> judges operational impact; severity and priority come from rules R1–R4 '
          'and P-rules, never from sentiment. It verifies evidence and can send review requests back to Agent 1 (max 2 rounds). '
          '<b>Agent 3</b> checks complaint history and SLA (when available), applies escalation rules E1–E5 and produces a '
          '<b>simulated</b> ticket that always needs human approval. A shared structured state records every message, tool call and decision.'
          '</div></div>')
-    kb = tools.egsqual_kb()
-    C.section("EGSQUAL service-quality dimensions")
-    st.dataframe(pd.DataFrame([{"key": k, "dimension": v["name_en"], "arabic": v["name_ar"], "definition": v["definition"], "source": v["source"]}
-                               for k, v in kb.items()]), hide_index=True, width="stretch")
+    _egsqual_section()
     sr = tools.severity_rules_kb()
     C.section("Severity & priority rules (Agent 2)")
     st.info(sr["principle"])

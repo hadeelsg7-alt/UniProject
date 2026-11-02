@@ -309,8 +309,10 @@ def issue_card(iss, k: int) -> None:
        f'{pill(iss.issue_type, TYPE_KIND.get(iss.issue_type, "outline"))}</div><div>{verified}</div></div>'
        f'<div class="desc">{esc(iss.description)}</div>'
        f'<div class="quote">«{esc(iss.evidence)}»</div>'
-       f'<div class="kv"><div class="k">EGSQUAL dimension</div><div class="v"><b>{esc(iss.dimension_name or iss.dimension)}</b>'
+       f'<div class="kv"><div class="k">Service-quality dimension</div><div class="v"><b>{esc(iss.dimension_name or iss.dimension)}</b>'
        f'<br><span class="small">{esc(iss.dimension_definition)}</span></div>'
+       f'<div class="k">EGSQUAL (provisional)</div><div class="v">{esc(iss.egsqual_candidate or "— (no EGSQUAL dimension)")}</div>'
+       f'<div class="k">Why this dimension</div><div class="v small">{esc(iss.dimension_reason or "—")}</div>'
        f'<div class="k">Affected service</div><div class="v">{esc(iss.affected_service)}</div>'
        f'<div class="k">Confidence</div><div class="v">{iss.confidence:.2f}</div>'
        f'<div class="k">Missing information</div><div class="v">{missing}</div></div>{note}</div>')

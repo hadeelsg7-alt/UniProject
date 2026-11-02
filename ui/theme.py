@@ -162,6 +162,12 @@ section[data-testid="stSidebar"] a[data-testid="stSidebarNavLink"][aria-current=
 [class*="st-key-frame_Overall"] {{ border: 3px solid #0E3B2C !important; border-radius: 18px !important;
                                  background: #F7FAF8 !important; padding: 14px 16px 6px 16px !important; }}
 [class*="st-key-frame_Agent"] .kpi {{ border-top-color: var(--agent) !important; border-color: var(--agent); }}
+/* Insights tables with right-to-left Arabic evidence */
+.ins-table {{ overflow-x: auto; margin: 4px 0 14px 0; }}
+.ins-table table {{ width: 100%; border-collapse: collapse; font-size: 0.86rem; background: #fff; border: 1px solid var(--border); border-radius: 10px; }}
+.ins-table th {{ background: var(--navy); color: #fff; text-align: left; padding: 7px 9px; font-weight: 600; }}
+.ins-table td {{ padding: 7px 9px; border-top: 1px solid var(--border); vertical-align: top; }}
+.ins-table td.rtl {{ min-width: 220px; font-size: 0.95rem; line-height: 1.55; }}
 /* Messages timeline */
 .msg {{ display:flex; gap: 12px; margin-bottom: 10px; }}
 .msg .dot {{ width: 36px; height: 36px; font-size: 1.05rem; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:#fff;

@@ -16,7 +16,7 @@ from schemas import (
     SEVERITY_ORDER, Agent2Output, AgentMessage, IssueAssessment, LLMImpact, LLMImpactAssessment,
     Priority, Severity, VerificationStatus, WorkflowState,
 )
-from tools import severity_rules_kb
+from tools import priority_matrix_kb
 
 _PRIO = ["P1", "P2", "P3", "P4"]
 
@@ -35,9 +35,10 @@ Judge impact from what the text states, NOT from how angry the reviewer is or th
 A one-star review can be a Low-impact issue. Do not assume facts not in the text.
 Return only the requested structured output."""
 
-    def __init__(self, llm=None):
+    def __init__(self, llm=None, matrix: dict | None = None):
         super().__init__(llm)
         self._cache: dict[tuple, LLMImpact] = {}
+        self.matrix = matrix  # Impact x Urgency cells; None = knowledge_base/impact_urgency_matrix.json
 
     # ------------------------------------------------------------------ #
     def assess(self, state: WorkflowState) -> list[AgentMessage]:
@@ -84,13 +85,15 @@ Return only the requested structured output."""
 
             sev = self.call_tool(state, "severity_rule_engine", f"Apply proposed severity rules to {iss.issue_id}",
                                  service_completion=imp.service_completion, scope=imp.scope, risk_flags=list(imp.risk_flags))
-            pr = self.call_tool(state, "priority_rule_engine", f"Apply proposed priority rules to {iss.issue_id}",
-                                severity=sev["severity"], scope=imp.scope)
+            pr = self.call_tool(state, "impact_urgency_matrix", f"Priority for {iss.issue_id} from the Impact x Urgency matrix",
+                                service_completion=imp.service_completion, scope=imp.scope, risk_flags=list(imp.risk_flags),
+                                matrix=self.matrix)
             assessments.append(IssueAssessment(
                 issue_id=iss.issue_id, issue_description=iss.description, service_completion=imp.service_completion,
                 scope=imp.scope, workaround_mentioned=imp.workaround_mentioned, risk_flags=list(imp.risk_flags),
                 impact_summary=imp.impact_summary, severity=Severity(sev["severity"]), priority=Priority(pr["priority"]),
-                rules_applied=[sev["rule"]] + pr["rules"], reasoning=f"{imp.reasoning} | Rule {sev['rule']}: {sev['explanation']}",
+                impact=pr["impact"], urgency=pr["urgency"], rules_applied=[sev["rule"]] + pr["rules"],
+                reasoning=f"{imp.reasoning} | Severity rule {sev['rule']}: {sev['explanation']} | Priority: {pr['explanation']}",
                 evidence=ev, verification_status=VerificationStatus.VERIFIED,
             ))
 
@@ -189,7 +192,7 @@ Return only the requested structured output."""
             res = state.resolved_concerns.get(self._key(c))
             if c in unresolved or (c[0] in weak_codes and res == "CONFIRMED"):
                 insufficient.update(c[1])
-        cap = severity_rules_kb().get("insufficient_evidence_priority_cap", "P3")
+        cap = priority_matrix_kb()["verification_cap"]["cap"]
         for a in assessments:
             if a.issue_id in insufficient:
                 a.verification_status = VerificationStatus.INSUFFICIENT_EVIDENCE

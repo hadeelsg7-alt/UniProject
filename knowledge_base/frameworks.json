@@ -1,0 +1,36 @@
+{
+  "_about": "How published frameworks INFORM this research prototype. The 'published concept' column summarises the frameworks from general knowledge; the official texts (ITIL 4 publications, ISO/IEC 20000-1:2018, ISO 10002:2018) were NOT accessed and should be checked before citing. The project claims no compliance, certification or official approval.",
+  "frameworks": [
+    {
+      "name": "ITIL 4 (AXELOS / PeopleCert, 2019)",
+      "published_concept": "Incident management practice: incidents are prioritised from their impact and urgency so that the most damaging ones are handled first; service level management sets agreed targets.",
+      "used_for": "Agent 2 derives priority from an Impact x Urgency matrix; Agent 3 attaches simulated response and resolution targets to tickets.",
+      "custom": "The impact and urgency rules, the three levels, the matrix cells and the SLA hours are this project's own design."
+    },
+    {
+      "name": "ISO/IEC 20000-1:2018 — Service management system requirements",
+      "published_concept": "Requirements for a service management system, including incident management, service requests, service level management and continual improvement, with recorded and traceable decisions.",
+      "used_for": "Every classification, prioritisation, routing and escalation decision is recorded in an audit trail; insights feed improvement.",
+      "custom": "No management system, certification or audit is implemented; the prototype only borrows the principle of documented, traceable handling."
+    },
+    {
+      "name": "ISO 10002:2018 — Guidelines for complaints handling in organizations",
+      "published_concept": "Guiding principles for complaints handling such as visibility, accessibility, responsiveness, objectivity, confidentiality, a customer-focused approach, accountability and continual improvement.",
+      "used_for": "Agent 3 acknowledges each piece of feedback with a reply draft, asks for missing details, decides from evidence, checks prior complaints before escalation, and keeps decisions accountable through human review.",
+      "custom": "The reply templates, the escalation rules E1–E5 and the routing to handling teams are research-defined."
+    },
+    {
+      "name": "EGSQUAL (Aljukhadar et al., 2022)",
+      "published_concept": "A validated survey scale of e-government website service quality with seven dimensions.",
+      "used_for": "Agent 1 maps each issue to a service-quality category with a provisional EGSQUAL dimension.",
+      "custom": "Using the scale as a coding frame for Arabic app reviews, the categories and the crosswalk are this project's adaptation (see the EGSQUAL section)."
+    }
+  ],
+  "human_in_the_loop": [
+    "Every simulated ticket, escalation recommendation and Arabic reply draft is a recommendation for a human officer.",
+    "No external escalation happens without explicit human approval (rule E5); escalation is simulated and nothing is sent to AMER, the DGA or any government system.",
+    "Complaint numbers, dates and statuses are never invented: missing details lead to a request for information or PENDING_VERIFICATION.",
+    "LLM failures fall back to transparent rules and are flagged on the result.",
+    "Severity, priority and escalation rules are research proposals that a service owner would have to review before any real use."
+  ]
+}

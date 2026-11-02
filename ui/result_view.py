@@ -194,8 +194,12 @@ def _agent3_panel(state, llm) -> None:
     if e.complaint_record:
         with st.expander("Complaint history record (SYNTHETIC data store)"):
             st.json(e.complaint_record.model_dump())
+    C.md(f'<div class="card"><h4>Recommended handling team</h4><b>{C.esc(a3.handling_team or "—")}</b>'
+         f'<div class="small" style="margin-top:4px">Research-defined routing rule: {C.esc(a3.handling_team_rule or "—")}</div></div>')
     if a3.ticket:
-        st.markdown("**Simulated service ticket**")
+        st.markdown("**Simulated service ticket** (SLA targets are research-defined and simulated)")
         C.ticket_card(a3.ticket)
     else:
         C.empty_state("✅", "No ticket", "No action is required for this feedback, so no ticket was generated.")
+    if a3.response_draft_ar:
+        C.arabic_draft(a3.response_draft_ar)

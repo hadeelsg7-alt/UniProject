@@ -111,13 +111,13 @@ def compute_insights(states: list[WorkflowState], analysis_date: Optional[date] 
             continue
         lead = sorted(s.agent2.assessments, key=lambda a: (-SEVERITY_ORDER[a.severity.value], a.priority.value))
         lead_issue = next((i for i in s.agent1.issues if lead and i.issue_id == lead[0].issue_id), None)
-        tickets.append({"action": a3.action.value, "app": s.review.app_name or s.review.app_id,
+        tickets.append({"action": a3.action.value, "app": s.review.app_name or s.review.app_id, "team": a3.handling_team or "—",
                         "dimension": lead_issue.dimension_name if lead_issue else "—",
                         "priority": lead[0].priority.value if lead else "—", "title": a3.ticket.title, "review_id": s.review.review_id})
     action_groups: dict[tuple, list[dict]] = defaultdict(list)
     for t in tickets:
         action_groups[(t["action"], t["app"], t["dimension"])].append(t)
-    improvements = [{"action": a, "app": app, "dimension": d, "tickets": len(ts),
+    improvements = [{"action": a, "app": app, "dimension": d, "tickets": len(ts), "team": ts[0]["team"],
                      "urgent": sum(t["priority"] in URGENT for t in ts), "example_title": ts[0]["title"]}
                     for (a, app, d), ts in sorted(action_groups.items(), key=lambda kv: (-sum(t["priority"] in URGENT for t in kv[1]), -len(kv[1])))]
 
@@ -127,6 +127,18 @@ def compute_insights(states: list[WorkflowState], analysis_date: Optional[date] 
                   for s in done if s.agent3.escalation.status == EscalationStatus.CANDIDATE_AWAITING_HUMAN_APPROVAL]
     pending = [{"review_id": s.review.review_id, "app": s.review.app_name, "missing": ", ".join(s.agent3.escalation.missing_fields)}
                for s in done if s.agent3.escalation.status == EscalationStatus.PENDING_VERIFICATION]
+
+    # ---- Per application -------------------------------------------------------
+    by_app = []
+    for app, n in apps.most_common():
+        rs = [r for r in rows if r["app"] == app]
+        dim = Counter(r["dimension_name"] for r in rs).most_common(1)
+        top = Counter(r["topic_label"] for r in rs).most_common(1)
+        by_app.append({"app": app, "reviews": n, "issues": len(rs), "urgent": sum(r["priority"] in URGENT for r in rs),
+                       "high_critical": sum(r["severity"] in ("High", "Critical") for r in rs),
+                       "top_dimension": f"{dim[0][0]} ({dim[0][1]})" if dim else "—",
+                       "top_issue": f"{top[0][0]} ({top[0][1]})" if top else "—"})
+    teams = Counter(t["team"] for t in tickets)
 
     ins = {
         "label": PROTOTYPE_LABEL,
@@ -146,7 +158,9 @@ def compute_insights(states: list[WorkflowState], analysis_date: Optional[date] 
         "escalation": [(e, c) for e, c in esc.most_common()],
         "escalation_candidates": candidates, "escalation_pending": pending,
         "dimensions": dimensions, "top_issues": top_issues[:10], "high_priority": high_priority,
-        "improvements": improvements[:10], "tickets": len(tickets),
+        "improvements": improvements[:10], "tickets": len(tickets), "by_app": by_app,
+        "teams": teams.most_common(),
+        "actionable": sum(s.agent3.action != ActionType.NO_ACTION for s in done),
     }
     ins["recommendations"] = management_recommendations(ins)
     ins["summary"] = executive_summary(ins)

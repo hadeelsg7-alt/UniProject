@@ -72,6 +72,9 @@ SLA_REFERENCE_DATE: date | None = date.fromisoformat(_ref) if _ref else None
 # --------------------------------------------------------------------------- #
 EGSQUAL_KB_PATH = KB_DIR / "egsqual_dimensions.json"
 EGSQUAL_REFERENCE_PATH = KB_DIR / "egsqual_reference.json"
+PRIORITY_MATRIX_PATH = KB_DIR / "impact_urgency_matrix.json"
+HANDLING_TEAMS_PATH = KB_DIR / "handling_teams.json"
+SLA_TARGETS_PATH = KB_DIR / "sla_targets.json"
 DIALECT_LEXICON_PATH = KB_DIR / "saudi_dialect_lexicon.json"
 ESCALATION_RULES_PATH = KB_DIR / "escalation_rules.json"
 COMPLAINT_HISTORY_PATH = KB_DIR / "complaint_history_synthetic.json"

@@ -105,3 +105,22 @@ def test_batch_survives_bad_input(offline_workflow):
     reviews = [ReviewInput(review_id=f"B{i}", text=t, rating=1) for i, t in enumerate(["لا يعمل", "؟؟؟", "!!!", "ok", "ممتاز"])]
     states = offline_workflow.run_batch(reviews)
     assert len(states) == 5 and all(s.agent3 is not None for s in states)
+
+
+def test_agent3_routes_applies_simulated_sla_and_drafts_arabic_reply():
+    from llm import LLMClient
+    from schemas import ReviewInput
+    from workflow import MultiAgentWorkflow
+    st = MultiAgentWorkflow(LLMClient(provider="offline")).run(
+        ReviewInput(review_id="Z", text="ما قدرت اسدد الفاتورة والدفع لا يعمل والمبلغ انخصم", rating=1))
+    a2, a3 = st.agent2, st.agent3
+    lead = a2.assessments[0]
+    assert lead.impact and lead.urgency and any(r.startswith("MATRIX[") for r in lead.rules_applied)
+    assert a3.ticket and a3.ticket.handling_team == a3.handling_team == "Payments & Finance Operations"
+    assert a3.ticket.sla_response_hours and a3.ticket.sla_resolution_due > a3.ticket.sla_response_due
+    assert a3.response_draft_ar and any("؀" <= ch <= "ۿ" for ch in a3.response_draft_ar)
+    # configurable SLA reaches the ticket
+    custom = MultiAgentWorkflow(LLMClient(provider="offline"), sla_targets={p: {"response_hours": 1, "resolution_hours": 2}
+                                                                              for p in ("P1", "P2", "P3", "P4")})
+    t = custom.run(ReviewInput(review_id="Z2", text="ما قدرت اسدد الفاتورة والدفع لا يعمل", rating=1)).agent3.ticket
+    assert (t.sla_response_hours, t.sla_resolution_hours) == (1, 2)

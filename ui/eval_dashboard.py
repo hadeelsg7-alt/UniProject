@@ -31,11 +31,12 @@ def _ctx():
 
 
 # --------------------------------------------------------------------------- #
-def page_eval_dashboard() -> None:
+def page_eval_dashboard(show_hero: bool = True) -> None:
     c = _ctx()
-    C.hero("Evaluation", "Per-agent Precision / Recall / F1 against validated reference labels, ticket JSON validity, "
-           "and Multi-Agent vs Single LLM vs Sequential LLM pipeline on the same test set.",
-           ["Human-verified labels only", "No fabricated scores", "Cost = estimate"])
+    if show_hero:
+        C.hero("Evaluation", "Per-agent Precision / Recall / F1 against validated reference labels, ticket JSON validity, "
+               "and Multi-Agent vs Single LLM vs Sequential LLM pipeline on the same test set.",
+               ["Human-verified labels only", "No fabricated scores", "Cost = estimate"])
     C.mode_banner(c.llm)
 
     labels, ref = _step_labels(c)

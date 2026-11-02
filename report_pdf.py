@@ -316,9 +316,15 @@ def build_executive_report(ins: dict) -> bytes:
         pdf.para("No operational issue was extracted from the analysed reviews.")
 
     # ---- 5 Priority ------------------------------------------------------------
-    pdf.section(5, "Priority Distribution", "Assigned by Agent 2's documented rules; never by tone or star rating.")
+    pdf.section(5, "Priority Distribution", "Assigned by Agent 2's research-defined Impact x Urgency matrix (ITIL 4-informed); "
+                "never by tone or star rating.")
     pdf.hbars("Issues by priority", [(p, c, PRIO_COL[p]) for p, c, _ in ins["priority"]])
-    pdf.table_rows(["Rule", "Definition"], [[r["id"], r["rule"]] for r in tools.severity_rules_kb()["priority_rules"]], [1, 6])
+    mk = tools.priority_matrix_kb()
+    pdf.table_rows(["Impact (row) / Urgency (column)", "High", "Medium", "Low"],
+                   [[f"Impact {i}"] + [mk["matrix"][i][u] for u in ("High", "Medium", "Low")] for i in ("High", "Medium", "Low")],
+                   [2, 1, 1, 1], aligns=["L", "C", "C", "C"])
+    pdf.table_rows(["Rule", "Definition"], [[r["id"], f"{r['level']}: {r['rule']}"] for r in mk["impact_rules"] + mk["urgency_rules"]]
+                   + [[mk["verification_cap"]["id"], mk["verification_cap"]["rule"]]], [1, 6])
     if ins["high_priority"]:
         hp = ins["high_priority"][:12]
         pdf.para(f"High-priority feedback requiring attention (showing {len(hp)} of {len(ins['high_priority'])} P1/P2 issues):",
@@ -349,15 +355,20 @@ def build_executive_report(ins: dict) -> bytes:
     pdf.table_rows(["Agent 3 action", "Reviews", "Share"], [[a, c, f"{p}%"] for a, c, p in ins["actions"]], [5, 1, 1],
                    aligns=["L", "C", "C"])
     if ins["improvements"]:
-        pdf.table_rows(["Action", "Application", "Dimension", "Tickets", "P1/P2", "Example ticket"],
-                       [[g["action"], g["app"], g["dimension"], g["tickets"], g["urgent"], g["example_title"]] for g in ins["improvements"]],
-                       [2.4, 1.8, 2.0, 1.3, 1.2, 3.2], aligns=["L", "L", "L", "C", "C", "L"])
+        pdf.table_rows(["Action", "Application", "Dimension", "Handling team", "Tickets", "P1/P2", "Example ticket"],
+                       [[g["action"], g["app"], g["dimension"], g["team"], g["tickets"], g["urgent"], g["example_title"]]
+                        for g in ins["improvements"]],
+                       [2.2, 1.7, 1.9, 1.9, 1.2, 1.1, 2.8], aligns=["L", "L", "L", "L", "C", "C", "L"])
 
     # ---- 8 SLA and escalation ----------------------------------------------------
     pdf.section(8, "Simulated SLA and Escalation Summary")
     pdf.note("RESEARCH-DEFINED SIMULATION. Escalation rules E1–E5 and the SLA values are proposed research rules, not official rules "
              "of the DGA or the AMER / Balaagh Digital service. Every escalation requires human approval, and nothing is submitted.",
              fill=(255, 247, 230), border=(201, 126, 0))
+    sla = ins.get("sla_targets") or tools.sla_targets_kb()["targets"]
+    pdf.table_rows(["Priority", "Simulated response target", "Simulated resolution target"],
+                   [[p, f"{sla[p]['response_hours']} h", f"{sla[p]['resolution_hours']} h"] for p in ("P1", "P2", "P3", "P4") if p in sla],
+                   [1, 2, 2], aligns=["C", "C", "C"])
     pdf.table_rows(["Escalation status", "Reviews"], [[s, c] for s, c in ins["escalation"]], [5, 1], aligns=["L", "C"])
     if ins["escalation_candidates"]:
         pdf.table_rows(["Review", "Application", "Complaint ref.", "SLA deadline", "Days overdue"],
@@ -379,9 +390,12 @@ def build_executive_report(ins: dict) -> bytes:
     pdf.section(10, "Methodology and Limitations")
     pdf.para("Method. Each review is processed by three cooperating agents. The Investigation Agent extracts independent issues with "
              "verbatim evidence and maps each to a service-quality dimension. The Impact Agent judges whether the beneficiary could "
-             "complete the service and applies severity rules R1–R4 and priority rules P-BASE, P-SCOPE and P-VERIFY. It can send an "
+             "complete the service, applies severity rules R1–R4 and sets priority with a research-defined Impact x Urgency matrix "
+             "informed by ITIL 4 (capped by P-VERIFY when evidence stays insufficient). It can send an "
              "issue back to the Investigation Agent for revision (at most two rounds). The Resolution Agent decides the action, "
-             "checks complaint history and SLA, and drafts a simulated ticket.", size=9)
+             "checks complaint history and SLA, routes a simulated ticket to a handling team with simulated SLA targets, and drafts an "
+             "Arabic reply for human review. ITIL 4, ISO/IEC 20000-1 and ISO 10002 inform the design; the project claims no "
+             "compliance with them and has no official approval.", size=9)
     pdf.ln(1.5)
     pdf.para(f"Coverage. This report covers the {cov['reviews']:,} reviews analysed in the session on {cov['analysis_date']}, not the "
              "whole dataset unless all reviews were analysed.", size=9)

@@ -42,6 +42,7 @@ h1, h2, h3, h4 {{ color: var(--navy); letter-spacing: -0.01em; }}
 section[data-testid="stSidebar"] {{ background: linear-gradient(180deg, var(--navy) 0%, var(--navy2) 100%); }}
 section[data-testid="stSidebar"] * {{ color: #E6F1EB !important; }}
 section[data-testid="stSidebar"] [data-baseweb="select"] * , section[data-testid="stSidebar"] input {{ color: var(--ink) !important; }}
+section[data-testid="stSidebar"] input {{ -webkit-text-fill-color: var(--ink) !important; opacity: 1 !important; }}
 section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {{ background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.25); }}
 section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button * {{ color: var(--ink) !important; }}
 section[data-testid="stSidebar"] a[data-testid="stSidebarNavLink"] {{ border-radius: 8px; }}

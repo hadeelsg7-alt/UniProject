@@ -1,4 +1,4 @@
-# Multi-Agent AI Framework for Arabic Beneficiary Feedback Analysis
+# GovFeedback AI — Multi-Agent Intelligence for Digital Service Quality
 
 **Project title:** *A Multi-Agent AI Framework for Arabic Beneficiary Feedback Analysis to Enhance Digital Service
 Quality and Beneficiary Experience in Saudi Government Digital Services.*
@@ -134,6 +134,9 @@ to exist verbatim in the dataset (checked by `run_scenarios.py`).
 | `ui/pages.py` | Pages: Dashboard, Analyse feedback (including the test scenarios), Service Quality Insights, Methodology & rules |
 | `insights.py` | Counts, groupings and rule-based recommendations shared by the Service Quality Insights page and the PDF |
 | `report_pdf.py` | Executive PDF report (fpdf2; Arabic shaped with HarfBuzz and set right-to-left; bundled DejaVu Sans in `assets/fonts`) |
+| `ui/agent_pages.py` | The three agent pages; they show the same analysed review from each agent's point of view |
+| `knowledge_base/impact_urgency_matrix.json` | Research-defined Impact × Urgency priority matrix (ITIL 4-informed) |
+| `knowledge_base/sla_targets.json`, `handling_teams.json`, `frameworks.json` | Simulated SLA targets, ticket routing, and how published frameworks inform the design |
 | `knowledge_base/egsqual_reference.json` | EGSQUAL citation (Aljukhadar et al., 2022), verification status, provisional crosswalk, adaptation and limitations |
 | `.streamlit/config.toml` | Light navy/teal theme for presentations |
 | `agents/agent1.py` | Feedback Investigation Agent |
@@ -318,11 +321,15 @@ Launch with `streamlit run app.py` and open <http://localhost:8501>.
 
 | Page | What to show |
 |---|---|
-| **Dashboard** | Dataset KPIs, then **Run sample analysis** to get KPIs and interactive charts grouped by agent: issues, feedback categories, EGSQUAL dimensions, severity, priority, *severity vs star rating*, actions and escalation status. Everything is computed only from reviews actually analysed in the session; the results download as CSV. |
-| **Analyse feedback** | Type a review, load an example or a test scenario (S6 shows a real Agent 2 → Agent 1 revision; S8, synthetic, shows an escalation candidate awaiting human approval), or pick one from the dataset. The pipeline shows the active agent live; the result shows the final decision, the workflow diagram and one tab per agent plus the communication log. |
-| **Service Quality Insights** | Executive view built only from analysed results: top affected service-quality dimensions (with the provisional EGSQUAL dimension), most frequent issues with Arabic evidence, P1/P2 feedback, Agent 3's improvement actions and management recommendations. **Generate Executive Report** builds a 10-section PDF (disabled until something has been analysed). |
-| **Evaluation** | Upload the reference labels, run the systems, and read per-agent P/R/Macro F1, ticket and escalation F1, JSON validity, and the Multi-Agent vs Single LLM vs Sequential pipeline comparison (Macro F1, Escalation F1, time, estimated cost). Statistical tests are in a collapsed *Advanced* section. |
-| **Methodology & rules** | EGSQUAL definitions, the R1–R4 / P-rules and the E1–E5 escalation rules. |
+| **Executive Dashboard** | Homepage for management. It shows full-dataset statistics (clearly separated) and, only after analysis, insights from analysed reviews: categories, priorities, top issues, affected dimensions, P1/P2 issues, actionable feedback and improvement opportunities. |
+| **Agent 1 — Feedback Analysis** | Arabic review input (typed, example, test scenario S1–S8 or dataset pick). Running it starts the full three-agent workflow. Shows issues, feedback type, service-quality (EGSQUAL) dimension with its reason, verbatim evidence and ambiguity. |
+| **Agent 2 — Impact & Prioritization** | The same review: Agent 1's hand-over, severity (R1–R4), the Impact × Urgency matrix cell behind each P1–P4, and the Agent 2 → Agent 1 re-evaluation requests. |
+| **Agent 3 — Resolution & Escalation** | Actionability, handling team, simulated ticket with research-defined SLA targets, escalation rules E1–E5 and an Arabic reply draft, all for human review. |
+| **Results & Evaluation** | Run a sample; per-agent results; the collaboration trace; ground-truth evaluation (P/R/Macro F1, confusion matrices, Multi-Agent vs Single LLM vs Sequential); CSV/JSON export. |
+| **Service Quality Insights** | Management view: issues, dimensions, trends across applications, severity/priority, recurring issues and improvements; **Generate Executive Report** (PDF). |
+| **Methodology & Rules** | Published frameworks (ITIL 4, ISO/IEC 20000-1, ISO 10002, EGSQUAL) versus research-defined rules, the matrix, simulated SLA targets, routing, escalation rules and human-in-the-loop requirements. |
+
+**Settings** (bottom of the sidebar) hold the reasoning engine, review rounds, SLA reference date, dataset upload, simulated SLA targets and the Impact × Urgency matrix cells.
 
 The live view is driven by the workflow's own callbacks and trace, so it shows only what existed at each point. Revision arrows and
 counters appear only when a review request really occurred.

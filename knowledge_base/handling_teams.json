@@ -1,0 +1,24 @@
+{
+  "_about": "RESEARCH-DEFINED routing of simulated tickets to handling teams (Agent 3). Team names are generic roles, not the structure of any specific government organisation. A topic rule wins over a dimension rule.",
+  "by_topic": {
+    "PAYMENT": "Payments & Finance Operations",
+    "LOGIN": "Identity & Access Support",
+    "PRIVACY": "Information Security"
+  },
+  "by_dimension": {
+    "SYSTEM_AVAILABILITY": "IT Operations & Application Support",
+    "FULFILLMENT": "Service Owner / Business Operations",
+    "EFFICIENCY": "Product & User Experience",
+    "INFORMATION_QUALITY": "Content & Data Quality",
+    "PRIVACY_SECURITY": "Information Security",
+    "RESPONSIVENESS": "Customer Care & Complaints",
+    "CONTACT": "Customer Care & Complaints",
+    "UNMAPPED": "Customer Care (triage)"
+  },
+  "by_action": {
+    "Request for additional information": "Customer Care (triage)",
+    "Follow-up on an existing complaint": "Customer Care & Complaints",
+    "Candidate for escalation to AMER / Balaagh Digital (simulated)": "Complaints Escalation Officer (human review)"
+  },
+  "default": "Customer Care (triage)"
+}

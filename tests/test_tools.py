@@ -46,12 +46,29 @@ def test_severity_rules():
     assert f("NOT_AFFECTED", "WIDESPREAD", [])["severity"] == "Low"
 
 
-def test_priority_rules():
-    p = tools.priority_rule_engine
-    assert p("Critical", "INDIVIDUAL")["priority"] == "P1"
-    assert p("Medium", "WIDESPREAD")["priority"] == "P2"
-    assert p("Low", "WIDESPREAD")["priority"] == "P4"
-    assert p("High", "INDIVIDUAL", evidence_insufficient=True)["priority"] == "P3"
+def test_impact_urgency_matrix():
+    m = tools.impact_urgency_matrix
+    assert m("BLOCKED", "INDIVIDUAL", [])["priority"] == "P2"                     # High impact x Medium urgency
+    assert m("BLOCKED", "INDIVIDUAL", ["FINANCIAL"])["priority"] == "P1"          # High x High
+    assert m("BLOCKED", "WIDESPREAD", [])["priority"] == "P1"
+    assert m("PARTIALLY_BLOCKED", "INDIVIDUAL", [])["priority"] == "P3"           # Medium x Medium
+    assert m("DEGRADED", "INDIVIDUAL", [])["priority"] == "P4"                    # Low x Low
+    assert m("NOT_AFFECTED", "INDIVIDUAL", [])["priority"] == "P4"
+    r = m("BLOCKED", "INDIVIDUAL", [], evidence_insufficient=True)
+    assert r["priority"] == "P3" and "P-VERIFY" in r["rules"]
+    custom = {lvl: {u: "P4" for u in ("High", "Medium", "Low")} for lvl in ("High", "Medium", "Low")}
+    assert m("BLOCKED", "WIDESPREAD", ["SAFETY"], matrix=custom)["priority"] == "P4"  # cells are configurable
+    assert m("BLOCKED", "INDIVIDUAL", [])["explanation"].startswith("Impact High")
+
+
+def test_handling_team_and_sla_targets():
+    assert tools.handling_team("SYSTEM_AVAILABILITY", "PAYMENT", "Internal technical ticket")["team"] == "Payments & Finance Operations"
+    assert tools.handling_team("EFFICIENCY", "", "Service improvement request")["team"] == "Product & User Experience"
+    assert "triage" in tools.handling_team("SYSTEM_AVAILABILITY", "", "Request for additional information")["team"]
+    t = tools.sla_target("P1")
+    assert t["found"] and t["simulated"] and t["response_hours"] < t["resolution_hours"]
+    assert tools.sla_target("P2", {"P2": {"response_hours": 1, "resolution_hours": 2}})["resolution_hours"] == 2
+    assert not tools.sla_target("P9")["found"]
 
 
 def test_sentiment_is_separate_from_severity():

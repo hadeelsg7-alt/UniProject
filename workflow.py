@@ -19,6 +19,7 @@ from datetime import date
 from typing import Callable, Iterable, Optional
 
 import config
+import tools
 from agents import FeedbackInvestigationAgent, ImpactAssessmentAgent, ResolutionEscalationAgent
 from llm import LLMClient
 from schemas import ReviewInput, WorkflowState
@@ -31,18 +32,24 @@ END = "END"
 
 
 class MultiAgentWorkflow:
-    def __init__(self, llm: Optional[LLMClient] = None, max_revisions: int = config.MAX_REVISIONS):
+    def __init__(self, llm: Optional[LLMClient] = None, max_revisions: int = config.MAX_REVISIONS,
+                 matrix: Optional[dict] = None, sla_targets: Optional[dict] = None):
+        """`matrix` overrides the Impact x Urgency cells and `sla_targets` the simulated SLA targets
+        (both default to the knowledge-base files)."""
         self.llm = llm or LLMClient()
         self.max_revisions = max_revisions
         self.agent1 = FeedbackInvestigationAgent(self.llm)
-        self.agent2 = ImpactAssessmentAgent(self.llm)
-        self.agent3 = ResolutionEscalationAgent(self.llm)
+        self.agent2 = ImpactAssessmentAgent(self.llm, matrix=matrix)
+        self.agent3 = ResolutionEscalationAgent(self.llm, sla_targets=sla_targets)
+        self.matrix, self.sla_targets = matrix, sla_targets
 
     def run(self, review: ReviewInput, reference_date: Optional[date] = None,
             on_step: Optional[Callable[[str, WorkflowState], None]] = None) -> WorkflowState:
         """Run the workflow. `on_step(node, state)` is called when each node starts
         (used by the UI to show which agent is really working); it never changes the flow."""
-        state = WorkflowState(review=review, max_revisions=self.max_revisions, reasoner=self.llm.name)
+        state = WorkflowState(review=review, max_revisions=self.max_revisions, reasoner=self.llm.name,
+                              run_config={"matrix": self.matrix or tools.priority_matrix_kb()["matrix"],
+                                          "sla_targets": self.sla_targets or tools.sla_targets_kb()["targets"]})
         if self.llm.note:
             state.log("Orchestrator", "CONFIG", self.llm.note)
         state.log("Orchestrator", "START", f"Reasoner: {self.llm.name}; max revisions: {self.max_revisions}")

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from agents.base import BaseAgent
 from schemas import (
@@ -27,8 +27,30 @@ class ResolutionEscalationAgent(BaseAgent):
     role = "Intelligent Resolution & Escalation Agent"
     instructions = """You are Agent 3, the Resolution & Escalation Agent. Using the findings of Agents 1 and 2, write a
 concise, factual SIMULATED ticket: an English title (max 12 words), the affected service/feature, and a clear issue
-description that cites the beneficiary's evidence. Do not invent complaint numbers, dates, statuses or facts that
-are not in the inputs. Return only the requested structured output."""
+description that cites the beneficiary's evidence. Also write response_draft_ar: a short, polite reply DRAFT in Arabic
+to the beneficiary (acknowledge, say what happens next in general terms, ask for missing details if needed). Never
+promise dates, compensation or outcomes. Do not invent complaint numbers, dates, statuses or facts that are not in
+the inputs. Return only the requested structured output."""
+
+    # Reply drafts used when no LLM draft is available. They promise nothing and contain no case facts.
+    DRAFTS_AR = {
+        ActionType.INTERNAL_TECHNICAL_TICKET: "شكراً لتواصلك ومشاركتنا ملاحظتك، ونعتذر عن الإزعاج. تم تسجيل المشكلة التي واجهتها "
+                                              "وإحالتها إلى الفريق الفني المختص لدراستها ومعالجتها، وسنوافيك بالمستجدات.",
+        ActionType.SERVICE_IMPROVEMENT_REQUEST: "شكراً لمشاركتنا ملاحظتك. تمت إحالتها إلى الفريق المختص بتطوير الخدمة لدراستها "
+                                                "ضمن فرص تحسين التجربة.",
+        ActionType.REQUEST_ADDITIONAL_INFO: "شكراً لتواصلك. لنتمكن من مساعدتك، نرجو تزويدنا بمزيد من التفاصيل: اسم الخدمة أو الخطوة "
+                                            "التي واجهت فيها المشكلة، ونص رسالة الخطأ إن وجدت، ونوع الجهاز.",
+        ActionType.FOLLOW_UP_EXISTING_COMPLAINT: "شكراً لتواصلك. لاحظنا إشارتك إلى شكوى سابقة؛ نرجو تزويدنا برقم الشكوى وتاريخ "
+                                                 "تقديمها لنتمكن من متابعتها.",
+        ActionType.ESCALATION_CANDIDATE: "شكراً لتواصلك. ملاحظتك المتعلقة بشكواك السابقة قيد المراجعة لدى الموظف المختص، "
+                                         "وسنتواصل معك بعد استكمال المراجعة.",
+        ActionType.NO_ACTION: "شكراً لكلماتك الطيبة ودعمك، يسعدنا أن الخدمة نالت رضاك.",
+    }
+
+    def __init__(self, llm=None, sla_targets: dict | None = None):
+        super().__init__(llm)
+        self.sla_targets = sla_targets  # simulated SLA targets; None = knowledge_base/sla_targets.json
+        self._llm_draft = ""
 
     def resolve(self, state: WorkflowState, reference_date: date | None = None) -> Agent3Output:
         r, a1, a2 = state.review, state.agent1, state.agent2
@@ -72,6 +94,7 @@ are not in the inputs. Return only the requested structured output."""
 
         # 3) Generate and validate the simulated ticket
         ticket = None
+        self._llm_draft = ""
         if action != ActionType.NO_ACTION:
             ticket = self._ticket(state, action, rationale, escalation)
             val = self.call_tool(state, "ticket_fields_validator", "Validate that the simulated ticket has all required fields",
@@ -81,10 +104,32 @@ are not in the inputs. Return only the requested structured output."""
                     setattr(ticket, f, getattr(ticket, f) or "unspecified")
                 state.log(self.name, "CHECK", f"Ticket fields {val['missing_fields']} were empty - set to 'unspecified'")
 
+        # 4) Route to a handling team and apply the simulated SLA targets (research-defined)
+        lead, issue = self._lead(state)
+        team = self.call_tool(state, "handling_team", "Recommend the team that should handle this feedback",
+                              dimension=issue.dimension if issue else "UNMAPPED", topic=issue.topic if issue else "",
+                              action=action.value)
+        if ticket is not None:
+            ticket.handling_team = team["team"]
+            if lead is not None:
+                t = self.call_tool(state, "sla_target", f"Simulated SLA targets for priority {lead.priority.value}",
+                                   priority=lead.priority.value, overrides=self.sla_targets)
+                if t["found"]:
+                    created = datetime.fromisoformat(ticket.created_at)
+                    ticket.sla_response_hours, ticket.sla_resolution_hours = t["response_hours"], t["resolution_hours"]
+                    ticket.sla_response_due = (created + timedelta(hours=t["response_hours"])).isoformat(timespec="minutes")
+                    ticket.sla_resolution_due = (created + timedelta(hours=t["resolution_hours"])).isoformat(timespec="minutes")
+
+        # 5) Reply draft to the beneficiary (always a DRAFT for human review)
+        draft = self._llm_draft.strip() or self.DRAFTS_AR[action]
+        state.log(self.name, "DECISION", "Arabic reply draft prepared (" + ("LLM" if self._llm_draft.strip() else "template")
+                  + "); a human must review it before any use")
+
         human = escalation.status in (EscalationStatus.CANDIDATE_AWAITING_HUMAN_APPROVAL, EscalationStatus.PENDING_VERIFICATION)
         final = self._final_text(action, escalation, a2)
         out = Agent3Output(actionable=actionable, action=action, action_rationale=rationale, escalation=escalation, ticket=ticket,
                            secondary_actions=secondary, final_decision=final, human_approval_required=human or bool(ticket),
+                           handling_team=team["team"], handling_team_rule=team["rule"], response_draft_ar=draft,
                            reasoner=self.llm.name if self.llm.available else "offline-rule-based")
         state.agent3 = out
         state.messages.append(AgentMessage(sender=self.name, receiver="Human officer", message_type="HANDOFF", content=final))
@@ -165,8 +210,10 @@ are not in the inputs. Return only the requested structured output."""
                        "assessment": lead.model_dump(include={"severity", "priority", "service_completion", "scope", "risk_flags", "impact_summary"}),
                        "other_issues": [i.description for i in a1.issues if i.issue_id != issue.issue_id], "action": action.value}
             if self.llm.available:
-                txt, _ = self.reason(state, "ticket drafting", json.dumps(payload, ensure_ascii=False, indent=1), LLMTicketText,
-                                     lambda: self._template(r, a1, lead, issue))
+                txt, src = self.reason(state, "ticket drafting", json.dumps(payload, ensure_ascii=False, indent=1), LLMTicketText,
+                                       lambda: self._template(r, a1, lead, issue))
+                if src != "offline-rule-based":
+                    self._llm_draft = txt.response_draft_ar
             else:
                 txt = self._template(r, a1, lead, issue)
                 state.log(self.name, "RULE_REASONING", "Ticket text drafted from template (offline)")

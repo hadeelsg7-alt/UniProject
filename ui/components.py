@@ -387,7 +387,11 @@ def ticket_card(t) -> None:
     fields = [("Ticket type", t.ticket_type), ("Application", t.application), ("Affected service", t.affected_service),
               ("Severity", t.severity), ("Priority", t.priority), ("Escalation status", t.escalation_status),
               ("EGSQUAL dimensions", ", ".join(t.egsqual_dimensions)), ("Source review", t.original_review_id),
-              ("Human approval", "Required" if t.human_approval_required else "Not required"), ("Created", t.created_at)]
+              ("Human approval", "Required" if t.human_approval_required else "Not required"), ("Created", t.created_at),
+              ("Handling team", t.handling_team or "—"),
+              ("Simulated SLA", f"respond ≤ {t.sla_response_hours} h · resolve ≤ {t.sla_resolution_hours} h"
+               if t.sla_response_hours else "— (no priority)"),
+              ("Simulated due", f"{t.sla_response_due} / {t.sla_resolution_due}" if t.sla_response_due else "—")]
     grid = "".join(f'<div class="f"><div class="k">{esc(k)}</div><div class="v">{esc(str(v))}</div></div>' for k, v in fields)
     ev = "".join(f'<div class="quote">«{esc(e)}»</div>' for e in t.evidence)
     md(f'<div class="ticket"><div class="th"><div><span class="id">{esc(t.ticket_id)}</span><div style="font-weight:700;font-size:1.05rem;margin-top:2px">'
@@ -398,3 +402,33 @@ def ticket_card(t) -> None:
        f'<div class="small"><b>Justification</b></div><div style="margin-bottom:8px">{esc(t.justification)}</div>'
        f'<div class="small"><b>Beneficiary evidence</b></div>{ev}</div>'
        f'<div class="foot">⚠️ {esc(t.disclaimer)}</div></div>')
+
+
+# --------------------------------------------------------------------------- #
+# Impact x Urgency matrix (Agent 2)
+# --------------------------------------------------------------------------- #
+PRIO_FILL = {"P1": "#0D366B", "P2": "#1C5CAB", "P3": "#3987E5", "P4": "#86B6EF"}
+
+
+def matrix_grid(matrix: dict, impact: Optional[str] = None, urgency: Optional[str] = None, caption: str = "") -> None:
+    """3x3 Impact (rows) x Urgency (columns) grid; the cell that produced the priority is outlined."""
+    lv = ["High", "Medium", "Low"]
+    head = "".join(f'<th>Urgency {u}</th>' for u in lv)
+    rows = ""
+    for i in lv:
+        cells = ""
+        for u in lv:
+            p = matrix[i][u]
+            hit = i == impact and u == urgency
+            txt = "#fff" if p in ("P1", "P2") else "#0E3B2C"
+            cells += (f'<td style="background:{PRIO_FILL.get(p, "#ccc")};color:{txt};font-weight:700;text-align:center;'
+                      f'{"outline:4px solid #EC835A;outline-offset:-4px;" if hit else ""}">{esc(p)}{" ◀" if hit else ""}</td>')
+        rows += f'<tr><th style="text-align:left">Impact {i}</th>{cells}</tr>'
+    md(f'<div class="ins-table" style="max-width:520px"><table><thead><tr><th></th>{head}</tr></thead><tbody>{rows}</tbody></table>'
+       f'<div class="small" style="margin-top:4px">{esc(caption)}</div></div>')
+
+
+def arabic_draft(text: str) -> None:
+    md('<div class="card" style="border-left:6px solid #C97E00"><h4>Arabic reply draft · مسودة رد</h4>'
+       '<div class="small" style="margin-bottom:6px">DRAFT for a human officer to review and edit — never sent automatically.</div>'
+       f'<div class="review-box"><div class="rtl">{esc(text)}</div></div></div>')

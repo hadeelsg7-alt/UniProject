@@ -68,10 +68,11 @@ def behavioural_checks(state: WorkflowState, expect: dict | None = None) -> list
         mismatches = []
         for a in a2.assessments:
             sev = tools.severity_rule_engine(a.service_completion, a.scope, a.risk_flags)["severity"]
-            pr = tools.priority_rule_engine(sev, a.scope, a.verification_status == VerificationStatus.INSUFFICIENT_EVIDENCE)["priority"]
+            pr = tools.impact_urgency_matrix(a.service_completion, a.scope, a.risk_flags,
+                                             evidence_insufficient=a.verification_status == VerificationStatus.INSUFFICIENT_EVIDENCE)["priority"]
             if sev != a.severity.value or pr != a.priority.value:
                 mismatches.append(f"{a.issue_id}: got {a.severity.value}/{a.priority.value}, rules give {sev}/{pr}")
-        out.append(Check("severity_priority_follow_rules", not mismatches, "all consistent with R1-R4 / P-rules" if not mismatches else "; ".join(mismatches)))
+        out.append(Check("severity_priority_follow_rules", not mismatches, "all consistent with R1-R4 and the Impact x Urgency matrix" if not mismatches else "; ".join(mismatches)))
     else:
         out.append(Check("severity_priority_follow_rules", None, "no assessments (no issues)"))
     if expect.get("no_severity"):

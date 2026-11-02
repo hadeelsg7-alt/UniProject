@@ -102,7 +102,7 @@ class StepDecide(BaseModel):
 # --------------------------------------------------------------------------- #
 def knowledge() -> str:
     kb = {k: {"name": d["name_en"], "definition": d["definition"]} for k, d in tools.egsqual_kb().items()}
-    sr, er = tools.severity_rules_kb(), tools.escalation_rules_kb()
+    sr, er, mk = tools.severity_rules_kb(), tools.escalation_rules_kb(), tools.priority_matrix_kb()
     actions = {
         "TECH_TICKET": "A bug that affects completing the service -> internal technical ticket",
         "SERVICE_IMPROVEMENT": "Suggestion / friction that does not block the service -> service improvement request",
@@ -116,7 +116,8 @@ def knowledge() -> str:
         "Severity & priority principle: " + sr["principle"],
         "Impact factors:\n" + json.dumps(sr["impact_factors"], ensure_ascii=False, indent=1),
         "Severity rules:\n" + json.dumps(sr["severity_rules"], ensure_ascii=False, indent=1),
-        "Priority rules:\n" + json.dumps(sr["priority_rules"], ensure_ascii=False, indent=1),
+        "Priority = Impact x Urgency matrix (impact rules, urgency rules, cells):\n"
+        + json.dumps({k: mk[k] for k in ("impact_rules", "urgency_rules", "matrix", "verification_cap")}, ensure_ascii=False, indent=1),
         "Escalation rules (all of E1-E4 must hold; minimum severity " + er["min_severity_for_escalation"] + "):\n"
         + json.dumps(er["rules"], ensure_ascii=False, indent=1),
         "Actions:\n" + json.dumps(actions, ensure_ascii=False, indent=1),

@@ -291,22 +291,77 @@ def severity_rule_engine(service_completion: str, scope: str, risk_flags: list[s
 
 
 _PRIORITY_LEVELS = ["P1", "P2", "P3", "P4"]
+_RISKS = {"FINANCIAL", "PERSONAL_DATA_SECURITY", "SAFETY", "LEGAL_DEADLINE"}
+LEVELS = ["High", "Medium", "Low"]
 
 
-def priority_rule_engine(severity: str, scope: str, evidence_insufficient: bool = False) -> dict:
-    """Apply the PROPOSED priority rules P-BASE, P-SCOPE, P-VERIFY."""
-    kb = severity_rules_kb()
-    pr = kb["priority_map"][severity]
-    rules = ["P-BASE"]
-    if scope == "WIDESPREAD" and SEVERITY_ORDER[severity] >= SEVERITY_ORDER["Medium"]:
-        pr = _PRIORITY_LEVELS[max(0, _PRIORITY_LEVELS.index(pr) - 1)]
-        rules.append("P-SCOPE")
+def priority_matrix_kb() -> dict:
+    return _load_json(str(config.PRIORITY_MATRIX_PATH))
+
+
+def impact_level(service_completion: str, scope: str, risk_flags: list[str]) -> tuple[str, str]:
+    """Impact = how much of the service is affected, and for how many (rules I-HIGH / I-MED / I-LOW)."""
+    if service_completion == "BLOCKED" or (service_completion == "PARTIALLY_BLOCKED" and scope == "WIDESPREAD"):
+        return "High", "I-HIGH"
+    if service_completion == "PARTIALLY_BLOCKED" or (service_completion == "DEGRADED" and (scope != "INDIVIDUAL" or risk_flags)):
+        return "Medium", "I-MED"
+    return "Low", "I-LOW"
+
+
+def urgency_level(service_completion: str, scope: str, risk_flags: list[str]) -> tuple[str, str]:
+    """Urgency = how quickly it must be handled (rules U-HIGH / U-MED / U-LOW)."""
+    if _RISKS & set(risk_flags) or (scope == "WIDESPREAD" and service_completion == "BLOCKED"):
+        return "High", "U-HIGH"
+    if service_completion in ("BLOCKED", "PARTIALLY_BLOCKED") or scope in ("RECURRING", "WIDESPREAD"):
+        return "Medium", "U-MED"
+    return "Low", "U-LOW"
+
+
+def impact_urgency_matrix(service_completion: str, scope: str, risk_flags: list[str], matrix: dict | None = None,
+                          evidence_insufficient: bool = False) -> dict:
+    """Priority from the research-defined Impact x Urgency matrix (ITIL 4-informed), plus the P-VERIFY cap."""
+    kb = priority_matrix_kb()
+    m = matrix or kb["matrix"]
+    imp, ir = impact_level(service_completion, scope, risk_flags)
+    urg, ur = urgency_level(service_completion, scope, risk_flags)
+    pr = m[imp][urg]
+    rules = [ir, ur, f"MATRIX[{imp},{urg}]"]
     if evidence_insufficient:
-        cap = kb.get("insufficient_evidence_priority_cap", "P3")
+        cap = kb["verification_cap"]["cap"]
         if _PRIORITY_LEVELS.index(pr) < _PRIORITY_LEVELS.index(cap):
             pr = cap
             rules.append("P-VERIFY")
-    return {"priority": pr, "rules": rules}
+    return {"priority": pr, "impact": imp, "urgency": urg, "rules": rules,
+            "explanation": f"Impact {imp} ({ir}) x Urgency {urg} ({ur}) -> {m[imp][urg]}"}
+
+
+def handling_teams_kb() -> dict:
+    return _load_json(str(config.HANDLING_TEAMS_PATH))
+
+
+def handling_team(dimension: str, topic: str, action: str) -> dict:
+    """Research-defined routing of a simulated ticket: action rule, then topic rule, then dimension rule."""
+    kb = handling_teams_kb()
+    if action in kb["by_action"]:
+        return {"team": kb["by_action"][action], "rule": f"action '{action}'"}
+    if topic in kb["by_topic"]:
+        return {"team": kb["by_topic"][topic], "rule": f"topic {topic}"}
+    if dimension in kb["by_dimension"]:
+        return {"team": kb["by_dimension"][dimension], "rule": f"dimension {dimension}"}
+    return {"team": kb["default"], "rule": "default"}
+
+
+def sla_targets_kb() -> dict:
+    return _load_json(str(config.SLA_TARGETS_PATH))
+
+
+def sla_target(priority: str, overrides: dict | None = None) -> dict:
+    """Research-defined SIMULATED response / resolution targets for a priority."""
+    t = (overrides or sla_targets_kb()["targets"]).get(priority)
+    if not t:
+        return {"found": False}
+    return {"found": True, "priority": priority, "response_hours": int(t["response_hours"]),
+            "resolution_hours": int(t["resolution_hours"]), "simulated": True}
 
 
 # =========================================================================== #
@@ -459,7 +514,9 @@ TOOL_REGISTRY: dict[str, ToolSpec] = {
         ToolSpec("impact_cue_detector", impact_cue_detector, ("Agent2",), "Detect operational impact cues"),
         ToolSpec("sentiment_intensity", sentiment_intensity, ("Agent2",), "Sentiment intensity (not severity)"),
         ToolSpec("severity_rule_engine", severity_rule_engine, ("Agent2",), "Apply proposed severity rules"),
-        ToolSpec("priority_rule_engine", priority_rule_engine, ("Agent2",), "Apply proposed priority rules"),
+        ToolSpec("impact_urgency_matrix", impact_urgency_matrix, ("Agent2",), "Priority from the Impact x Urgency matrix"),
+        ToolSpec("handling_team", handling_team, ("Agent3",), "Route the simulated ticket to a handling team"),
+        ToolSpec("sla_target", sla_target, ("Agent3",), "Look up simulated SLA targets for a priority"),
         ToolSpec("complaint_reference_extractor", complaint_reference_extractor, ("Agent3",), "Detect prior complaint reference"),
         ToolSpec("complaint_history_lookup", complaint_history_lookup, ("Agent3",), "Look up complaint history (synthetic)"),
         ToolSpec("sla_checker", sla_checker, ("Agent3",), "Check SLA response deadline"),

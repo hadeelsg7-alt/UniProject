@@ -72,6 +72,8 @@ def load_reviews(source: Union[str, Path, bytes, io.IOBase], drop_duplicates: bo
         "app_name": raw[cols["app_name"]].astype("string").fillna("UNKNOWN").str.strip() if cols["app_name"] else "UNKNOWN",
         "rating": pd.to_numeric(raw[cols["rating"]], errors="coerce").astype("Int64") if cols["rating"] else pd.NA,
     })
+    if not cols["app_name"]:  # no separate name column: show the application identifier instead of UNKNOWN
+        df["app_name"] = df["app_id"]
     n_raw = len(df)
     empty = df["text"].eq("")
     df = df[~empty].copy()

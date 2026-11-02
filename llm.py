@@ -40,6 +40,9 @@ class LLMClient:
         self.input_tokens = 0
         self.output_tokens = 0
         self.successful_calls = 0
+        # Set after a non-retryable account/configuration error (billing, key, model): later calls fail fast
+        # instead of repeating the same failing request for every review.
+        self.fatal_error = ""
 
         if requested == "anthropic":
             if not config.ANTHROPIC_API_KEY:
@@ -85,6 +88,8 @@ class LLMClient:
         with exponential backoff. Raises LLMError on final failure."""
         if not self.available:
             raise LLMError("No LLM provider available (offline mode)")
+        if self.fatal_error:
+            raise LLMError(f"LLM disabled for this run: {self.fatal_error}")
         last_err: Exception | None = None
         for attempt in range(config.LLM_MAX_RETRIES):
             try:
@@ -92,6 +97,9 @@ class LLMClient:
                     return self._anthropic(system, user, schema)
                 return self._openai(system, user, schema)
             except _NonRetryable as e:
+                if "refusal" not in str(e):
+                    self.fatal_error = explain_llm_error(str(e))
+                    raise LLMError(self.fatal_error) from e
                 raise LLMError(str(e)) from e
             except Exception as e:  # transient: rate limit, 5xx, timeout, invalid JSON
                 last_err = e
@@ -167,6 +175,41 @@ class LLMClient:
 
 class _NonRetryable(Exception):
     pass
+
+
+def explain_llm_error(message: str) -> str:
+    """Turn a provider error into a plain explanation (never includes the API key)."""
+    m = message.lower()
+    if "credit balance" in m or "billing" in m or "insufficient_quota" in m or "quota" in m:
+        return ("The provider account has no remaining credit or billing is not set up (HTTP 400/429). Add credit in the "
+                "provider console (Anthropic: console.anthropic.com → Plans & Billing); until then the rule-based fallback is used.")
+    if "authentication" in m or "invalid x-api-key" in m or "401" in m:
+        return "The API key was rejected (HTTP 401). Check ANTHROPIC_API_KEY in .env."
+    if "permission" in m or "403" in m:
+        return "The API key has no permission for this model (HTTP 403)."
+    if "notfound" in m or "not_found" in m or "404" in m:
+        return "The configured model was not found (HTTP 404). Check ANTHROPIC_MODEL in .env."
+    if "badrequest" in m or "400" in m:
+        return "The provider rejected the request (HTTP 400): " + message[:160]
+    return message[:200]
+
+
+class _Ping(BaseModel):
+    ok: bool
+
+
+def health_check(client: "LLMClient") -> dict:
+    """One tiny structured call to verify key, model, billing and structured output. Costs a few tokens."""
+    if not client.available:
+        return {"ok": False, "message": client.note or "Offline mode: no LLM configured."}
+    saved, client.fatal_error = client.fatal_error, ""
+    try:
+        client.structured("Reply with ok=true.", "Health check.", _Ping)
+        return {"ok": True, "message": f"{client.name} answered a structured test request."}
+    except LLMError as e:
+        return {"ok": False, "message": str(e)}
+    finally:
+        client.fatal_error = client.fatal_error or saved
 
 
 class StubLLM(LLMClient):

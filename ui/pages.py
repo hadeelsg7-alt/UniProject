@@ -3,7 +3,6 @@ st.session_state["ctx"] by app.py. Results of every run are kept in a session
 store so the overview dashboard reflects only analyses that really ran."""
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from datetime import date
 from typing import Optional
@@ -19,7 +18,6 @@ from ui import charts as CH
 from ui import components as C
 from ui import theme as T
 
-from workflow import state_to_dict, state_to_row
 
 
 @dataclass
@@ -70,10 +68,8 @@ def run_batch_with_progress(reviews: list[ReviewInput], label: str) -> list[Work
     states = ctx().workflow.run_batch(reviews, reference_date=ctx().ref_date,
                                       progress=lambda k, n: bar.progress(k / n, text=f"{label}: {k}/{n}"))
     bar.empty()
-    fb = sum(1 for s in states if any(e.action == "LLM_FALLBACK" for e in s.decision_log))
-    if ctx().llm.available and fb:
-        st.error(f"⛔ {fb} of {len(states)} review(s) had at least one LLM failure and used the rule-based fallback for that step. "
-                 "Open a result to see which step.")
+    if ctx().llm.fatal_error:
+        st.session_state["llm_fatal"] = ctx().llm.fatal_error
     return states
 
 
@@ -97,80 +93,13 @@ def review_picker(prefix: str, limit: int = 500) -> Optional[pd.DataFrame]:
     return sub
 
 
-def agent_results(states: list[WorkflowState], key: str, show_rating_chart: bool = True) -> None:
-    """KPIs and charts grouped by the agent that produced them, each in that agent's coloured frame."""
-    rows = pd.DataFrame([state_to_row(s) for s in states])
-    iss = issue_frame(states)
-    n = max(len(rows), 1)
-    A1, A2, A3 = (C.AGENTS[k]["color"] for k in ("Agent1", "Agent2", "Agent3"))
-
-    C.kpi_row([("Reviews analysed", len(rows), f"{rows['review_id'].nunique()} unique · input to all three agents", "navy")])
-    st.write("")
-
-    # ---- Agent 1: Investigation -------------------------------------------
-    with st.container(key=f"frame_Agent1_res_{key}"):
-        C.agent_section_header("Agent1", "issues, feedback types, EGSQUAL dimensions, ambiguity")
-        C.kpi_row([("Issues extracted", len(iss), f"{len(iss) / n:.2f} per review"),
-                   ("Multi-issue reviews", int((rows["n_issues"] >= 2).sum()), "2+ independent issues"),
-                   ("Need clarification", int((rows["analysis_status"] == "NEEDS_CLARIFICATION").sum()), "ambiguous / incomplete")])
-        st.write("")
-        g1, g2 = st.columns(2)
-        with g1, st.container(border=True):
-            st.markdown("**Feedback categories** · primary type per review")
-            st.altair_chart(CH.single_hue_bars(rows["feedback_type"], A1, "Reviews"), width="stretch")
-        with g2, st.container(border=True):
-            st.markdown("**Service-quality dimensions (EGSQUAL)** · per extracted issue")
-            if iss.empty:
-                st.caption("No issues extracted yet.")
-            else:
-                st.altair_chart(CH.single_hue_bars(iss["dimension"], A1, "Issues"), width="stretch")
-
-    # ---- Agent 2: Impact --------------------------------------------------
-    with st.container(key=f"frame_Agent2_res_{key}"):
-        C.agent_section_header("Agent2", "severity, priority, sentiment vs severity, review requests")
-        hi = int(iss["severity"].isin(["High", "Critical"]).sum())
-        urgent = int(iss["priority"].isin(["P1", "P2"]).sum())
-        C.kpi_row([("High / Critical issues", hi, f"{hi / max(len(iss), 1) * 100:.0f}% of issues"),
-                   ("P1 / P2 issues", urgent, "urgent priorities"),
-                   ("Revision requests", int((rows["revision_rounds"] > 0).sum()), "reviews sent back to the Investigation Agent")])
-        st.write("")
-        g3, g4 = st.columns(2)
-        with g3, st.container(border=True):
-            st.markdown("**Issue severity** · operational impact (rules R1–R4)")
-            st.altair_chart(CH.severity_bars(iss["severity"]), width="stretch")
-        with g4, st.container(border=True):
-            st.markdown("**Issue priority** · P1 (most urgent) → P4")
-            st.altair_chart(CH.priority_bars(iss["priority"]), width="stretch")
-        if show_rating_chart:
-            with st.container(border=True):
-                st.markdown("**Severity is not the star rating** · share of each overall severity within each rating")
-                st.altair_chart(CH.severity_by_rating(rows), width="stretch")
-                st.caption("'No severity' = no concrete operational issue was found (e.g. praise or vague complaints).")
-
-    # ---- Agent 3: Resolution ----------------------------------------------
-    with st.container(key=f"frame_Agent3_res_{key}"):
-        C.agent_section_header("Agent3", "recommended actions, escalation eligibility, simulated tickets")
-        tickets = sum(1 for s in states if s.agent3 and s.agent3.ticket)
-        esc_n = int(rows["escalation_status"].isin(["CANDIDATE_AWAITING_HUMAN_APPROVAL", "PENDING_VERIFICATION"]).sum())
-        C.kpi_row([("Simulated tickets", tickets, "none submitted externally"),
-                   ("Escalation candidate / pending", esc_n, "always needs human approval"),
-                   ("No action required", int((rows["action"] == "No action required").sum()), "e.g. praise only")])
-        st.write("")
-        g5, g6 = st.columns(2)
-        with g5, st.container(border=True):
-            st.markdown("**Recommended action** · per review")
-            st.altair_chart(CH.single_hue_bars(rows["action"], A3, "Reviews"), width="stretch")
-        with g6, st.container(border=True):
-            st.markdown("**Escalation status** · per review (simulated)")
-            st.altair_chart(CH.single_hue_bars(rows["escalation_status"], A3, "Reviews"), width="stretch")
-    return rows
-
-
-# =========================================================================== #
-# 1. Executive Dashboard (homepage)
-# =========================================================================== #
 PAGES: dict = {}  # name -> st.Page, filled by app.py so pages can link to each other
-PROTOTYPE = "Research Prototype — Proposed Decision-Support Solution"
+PROTOTYPE = config.PROTOTYPE_LABEL
+
+
+def presentation() -> bool:
+    """Management Presentation Mode: hides developer diagnostics, keeps limitations and simulation labels."""
+    return bool(st.session_state.get("cfg_presentation", False))
 
 
 def _goto(page: str, label: str) -> None:
@@ -178,156 +107,10 @@ def _goto(page: str, label: str) -> None:
         st.page_link(PAGES[page], label=label, icon=":material/arrow_forward:")
 
 
-def page_executive() -> None:
-    import insights as INS
-
-    c = ctx()
-    C.hero("GovFeedback AI", "Multi-Agent Intelligence for Digital Service Quality — what beneficiaries report about Saudi "
-           "government mobile services, and where to act first.", [PROTOTYPE])
-
-    C.section("Full dataset", "all reviews in the loaded file · before any analysis")
-    if c.info:
-        df = c.df
-        C.kpi_row([("Total reviews", f"{c.info['rows_in_file']:,}", "rows in the file", "navy"),
-                   ("Unique reviews", f"{c.info['rows_available']:,}", f"{c.info['duplicates_dropped']} duplicates removed", "navy"),
-                   ("Applications", c.info["apps"], "government apps", "navy"),
-                   ("Average rating", f"{df['rating'].mean():.2f} ★", f"{(df['rating'] <= 2).mean() * 100:.0f}% rated 1–2 ★", "navy")])
-    else:
-        C.empty_state("📁", "No dataset loaded", "Upload the reviews CSV in Settings (bottom of the sidebar).")
-
-    states = [s for s in store().values() if s.agent3 is not None]
-    total = c.info["rows_available"] if c.info else None
-    C.section("Analysed feedback", f"{len(states):,} review(s) analysed by the three agents"
-              + (f" · {len(states) / total * 100:.1f}% of the unique reviews" if total else ""))
-    if not states:
-        C.empty_state("📊", "No analysis yet — no insights are shown", "Insights appear only after reviews have been analysed. "
-                      "Analyse a single review on the Agent 1 page, or a sample on Results & Evaluation.")
-        _goto("agent1", "Analyse a review — Agent 1")
-        _goto("results", "Analyse a sample — Results & Evaluation")
-        return
-    ins = INS.compute_insights(states)
-    cov = ins["coverage"]
-    urgent = sum(n for p, n, _ in ins["priority"] if p in INS.URGENT)
-    C.kpi_row([("Reviews analysed", cov["reviews"], f"{cov['apps']} application(s)"),
-               ("Service issues", cov["issues"], "evidence-backed"),
-               ("Actionable feedback", ins["actionable"], f"{ins['actionable'] / cov['reviews'] * 100:.0f}% of analysed reviews"),
-               ("P1 / P2 issues", urgent, "require attention first", "warn" if urgent else "")])
-    st.write("")
-    for line in ins["summary"][:3]:
-        st.markdown(f"- {line}")
-
-    g1, g2 = st.columns(2)
-    rows = pd.DataFrame([state_to_row(s) for s in states])
-    iss = issue_frame(states)
-    with g1, st.container(border=True):
-        st.markdown("**Feedback categories** · share of analysed reviews")
-        st.altair_chart(CH.single_hue_bars(rows["feedback_type"], T.TEAL, "Reviews"), width="stretch")
-    with g2, st.container(border=True):
-        st.markdown("**Priority distribution** · P1 most urgent (Impact × Urgency matrix)")
-        if iss.empty:
-            st.caption("No operational issue extracted.")
-        else:
-            st.altair_chart(CH.priority_bars(iss["priority"]), width="stretch")
-    g3, g4 = st.columns(2)
-    with g3, st.container(border=True):
-        st.markdown("**Most affected service-quality dimensions** · issues per dimension (provisional EGSQUAL)")
-        if ins["dimensions"]:
-            st.altair_chart(CH.single_hue_bars(pd.Series([d["name"].split(" (")[0] for d in ins["dimensions"] for _ in range(d["issues"])]),
-                                               T.NAVY, "Issues"), width="stretch")
-        else:
-            st.caption("No operational issue extracted.")
-    with g4, st.container(border=True):
-        st.markdown("**Summary of actionable feedback** · Agent 3 decision per review")
-        st.altair_chart(CH.single_hue_bars(rows["action"], C.AGENTS["Agent3"]["color"], "Reviews"), width="stretch")
-
-    C.section("Most frequently reported issues", "grouped by topic and dimension · verbatim evidence")
-    if ins["top_issues"]:
-        _rtl_table(pd.DataFrame([{"Issue": t["issue"], "Dimension": t["dimension"], "Issues": t["count"], "P1/P2": t["urgent"],
-                                  "Example evidence": t["examples"][0]["evidence"] if t["examples"] else ""}
-                                 for t in ins["top_issues"][:6]]), ("Example evidence",))
-    C.section("High-priority issues requiring attention", f"{len(ins['high_priority'])} issue(s) with priority P1 or P2")
-    if ins["high_priority"]:
-        _rtl_table(pd.DataFrame([{"Priority": r["priority"], "Application": r["app"], "Issue": r["description"], "Evidence": r["evidence"]}
-                                 for r in ins["high_priority"][:8]]), ("Evidence",))
-    else:
-        st.caption("No P1/P2 issue in the analysed feedback.")
-    C.section("Key improvement opportunities", "rule-based, each with the counts it rests on")
-    for k, r in enumerate(ins["recommendations"], start=1):
-        st.markdown(f"**{k}. {r['title']}**  \n{r['basis']}")
-    _goto("insights", "Full Service Quality Insights and the executive PDF report")
+def analysed() -> list[WorkflowState]:
+    return [s for s in store().values() if s.agent3 is not None]
 
 
-# =========================================================================== #
-# 2. Results & Evaluation
-# =========================================================================== #
-def page_results() -> None:
-    from ui.eval_dashboard import page_eval_dashboard
-
-    c = ctx()
-    C.hero("Results & Evaluation", "Run the three agents on a sample, inspect every result and the agents' collaboration, "
-           "and measure accuracy against human-verified labels.", [PROTOTYPE, "No fabricated scores"])
-    t1, t2, t3 = st.tabs(["📋 Analysis results", "🔁 Agent collaboration trace", "🎯 Ground-truth evaluation"],
-                         key="res_tabs", on_change="rerun")
-    with t1:
-        with st.container(border=True):
-            a, b, d = st.columns([2, 1, 1])
-            default_n = 200 if not c.llm.available else 10
-            n = a.number_input("Analyse a random sample of reviews from the dataset", 1, 2000, default_n, step=10,
-                               help="LLM mode makes about 3–6 API calls per review." if c.llm.available else "Offline mode: ~20 ms per review.")
-            b.write("")
-            b.write("")
-            go = b.button("▶ Run sample analysis", type="primary", disabled=c.df is None, width="stretch")
-            d.write("")
-            d.write("")
-            if d.button("Clear results", disabled=not store(), width="stretch"):
-                st.session_state["store"] = {}
-                st.session_state.pop("ins_pdf", None)
-                st.rerun()
-            if go:
-                sample = c.df.sample(min(int(n), len(c.df)), random_state=None)
-                remember(run_batch_with_progress([row_to_review(r) for _, r in sample.iterrows()], "Analysing"), "dashboard")
-                st.rerun()
-        states = [s for s in store().values() if s.agent3 is not None]
-        if not states:
-            C.empty_state("📋", "No results yet", "Run a sample above or analyse a review on the Agent 1 page.")
-        else:
-            agent_results(states, "res")
-            table = pd.DataFrame([state_to_row(s) for s in states])
-            C.section("All analysed reviews", f"{len(table)} row(s)")
-            st.dataframe(table, hide_index=True, width="stretch", height=320)
-            d1, d2 = st.columns(2)
-            d1.download_button("⬇️ Results (CSV)", table.to_csv(index=False).encode("utf-8-sig"), "analysis_results.csv",
-                               "text/csv", width="stretch")
-            d2.download_button("⬇️ Full results with traces (JSON)",
-                               json.dumps([state_to_dict(s) for s in states], ensure_ascii=False, indent=1).encode("utf-8"),
-                               "analysis_results.json", "application/json", width="stretch")
-    with t2:
-        states = [s for s in store().values() if s.agent3 is not None]
-        if not states:
-            C.empty_state("🔁", "No trace yet", "Analyse a review first.")
-        else:
-            keys = {s.review.review_id: s for s in states}
-            rid = st.selectbox("Review", list(keys), index=len(keys) - 1, key="trace_pick",
-                               format_func=lambda k: f"{k} · {keys[k].review.app_name} · {keys[k].review.text[:70]}")
-            s = keys[rid]
-            C.workflow_diagram(s, llm=c.llm)
-            req = sum(1 for m in s.messages if m.message_type == "REVIEW_REQUEST")
-            st.caption(f"{len(s.messages)} message(s) · {req} review request(s) · path: {' → '.join(s.node_trace)}")
-            C.message_timeline(s.messages)
-            with st.expander(f"Decision log ({len(s.decision_log)}) and tool calls ({len(s.tool_calls)})"):
-                log = pd.DataFrame([e.model_dump() for e in s.decision_log])
-                st.dataframe(log.assign(agent=log["agent"].map(C.agent_name))[["step", "agent", "action", "detail"]],
-                             hide_index=True, width="stretch")
-                tl = pd.DataFrame([t.model_dump() for t in s.tool_calls])
-                if not tl.empty:
-                    st.dataframe(tl.assign(agent=tl["agent"].map(C.agent_name)), hide_index=True, width="stretch")
-    with t3:
-        page_eval_dashboard(show_hero=False)
-
-
-# =========================================================================== #
-# 3. Service Quality Insights (executive dashboard + PDF report)
-# =========================================================================== #
 def _rtl_table(df: pd.DataFrame, rtl_cols: tuple[str, ...]) -> None:
     """HTML table: Arabic evidence columns are set right-to-left; everything is escaped."""
     head = "".join(f"<th>{C.esc(str(c))}</th>" for c in df.columns)
@@ -337,121 +120,289 @@ def _rtl_table(df: pd.DataFrame, rtl_cols: tuple[str, ...]) -> None:
     C.md(f'<div class="ins-table"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>')
 
 
-def page_insights() -> None:
-    import insights as INS
-    import report_pdf
+# =========================================================================== #
+# 1. Data & Run Analysis (starting page)
+# =========================================================================== #
+EXAMPLES = {
+    "Absher — renewal error, fees deducted": ("Absher", 2, "ابي اجدد الاقامة للعامل والتطبيق يقول حدث خطأ غير متوقع، حاولت اكثر من مره ونفس المشكله، والرسوم انخصمت من الحساب"),
+    "Nafath — widespread login failure": ("Nafath", 1, "الكل عندهم نفس المشكله نفاذ ما يرسل الاشعار للجوال وما نقدر ندخل اي منصة حكومية"),
+    "Sehhaty — booking not fulfilled + freezes": ("Sehhaty", 1, "حجزت موعد في المركز الصحي من التطبيق وطلع لي تم الحجز بس لما رحت قالوا ما فيه موعد باسمك، وفوق كذا التطبيق يعلق كل ما افتح صفحة المواعيد"),
+    "Tawakkalna — praise only": ("Tawakkalna", 5, "التطبيق ممتاز وسهل الاستخدام الله يعطيكم العافية"),
+}
 
-    C.hero("Service Quality Insights", "Executive view of the analysed beneficiary feedback: affected service-quality dimensions, "
-           "frequent issues, urgent feedback and Agent 3's recommended improvements.", [INS.PROTOTYPE_LABEL])
-    states = [s for s in store().values() if s.agent3 is not None]
-    ins = INS.compute_insights(states)
-    cov = ins["coverage"]
 
+def _status_counts(states: list[WorkflowState]) -> dict:
+    from workflow import execution_status
+    out = {"LLM": 0, "Rule-based fallback": 0, "Rule-based (offline)": 0, "Failed": 0}
+    for s in states:
+        out[execution_status(s)] += 1
+    return out
+
+
+def _single_review_input(c) -> None:
+    from scenarios import get_scenarios
+
+    scen = {f"Test scenario {s.key} — {s.title}" + (" (synthetic)" if s.synthetic else ""): s for s in get_scenarios()}
+    ex = st.selectbox("Load an example or a test scenario (S6: review loop · S8: simulated escalation)",
+                      ["—"] + list(EXAMPLES) + list(scen), key="an_ex")
+    if ex != "—" and st.session_state.get("an_ex_loaded") != ex:
+        if ex in scen:
+            r = scen[ex].review
+            st.session_state.update({"an_text": r.text, "an_app": r.app_id, "an_rating": r.rating})
+        else:
+            app, rating, text = EXAMPLES[ex]
+            st.session_state.update({"an_text": text, "an_app": app, "an_rating": rating})
+        st.session_state["an_ex_loaded"] = ex
+    txt = st.text_area("Arabic review", key="an_text", height=90, placeholder="اكتب مراجعة المستفيد هنا…")
+    a, b = st.columns(2)
+    st.session_state.setdefault("an_app", "CUSTOM")
+    app = a.text_input("Application", key="an_app")
+    rating = b.selectbox("Star rating", [None, 1, 2, 3, 4, 5], key="an_rating")
+    review, ref_date = None, c.ref_date
+    sc = scen.get(ex)
+    if sc is not None and txt.strip() == sc.review.text.strip():  # unchanged scenario: keep its id, flags and SLA date
+        review, ref_date = sc.review, sc.reference_date or c.ref_date
+        if sc.synthetic:
+            st.caption(f"🧪 Synthetic scenario: the review and its complaint record are artificial; SLA date fixed at {sc.reference_date}.")
+    elif txt and txt.strip():
+        n = st.session_state.get("typed_n", 0) + 1
+        review = ReviewInput(review_id=f"TYPED-{n}", text=txt.strip(), app_id=app or "CUSTOM", app_name=app or "CUSTOM", rating=rating)
+    if st.button("▶ Run Multi-Agent Analysis on this review", disabled=review is None, key="an_run"):
+        from ui.result_view import run_live
+        if review.review_id.startswith("TYPED-"):
+            st.session_state["typed_n"] = st.session_state.get("typed_n", 0) + 1
+        state = run_live(c.workflow, review, ref_date, c.llm)
+        remember([state], "single")
+        st.session_state["current_key"] = f"single:{state.review.review_id}"
+        if c.llm.fatal_error:
+            st.session_state["llm_fatal"] = c.llm.fatal_error
+        st.session_state["last_run"] = _status_counts([state])
+
+
+def page_data_run() -> None:
+    c = ctx()
+    C.hero(config.APP_TITLE_EN, "Upload or select the beneficiary reviews, then run the three cooperating agents.",
+           [PROTOTYPE], title_ar=config.APP_TITLE_AR)
+
+    C.section("1 · Dataset", "the only place where data is loaded")
+    a, b = st.columns([1, 2])
+    src = a.radio("Source", ["Existing dataset", "Upload a CSV file"], key="data_src", label_visibility="collapsed")
+    if src == "Upload a CSV file":
+        up = b.file_uploader("Reviews CSV (UTF-8; needs a review-text column such as 'Content')", type=["csv"], key="data_upload")
+        if up is not None and st.session_state.get("dataset_name") != up.name:
+            st.session_state["dataset_bytes"] = up.getvalue()
+            st.session_state["dataset_name"] = up.name
+            st.rerun()
+    elif st.session_state.get("dataset_bytes"):
+        if b.button("Use the existing dataset (data/reviews.csv) again"):
+            st.session_state.pop("dataset_bytes", None)
+            st.session_state.pop("dataset_name", None)
+            st.rerun()
+    if c.info:
+        b.caption(f"Loaded: **{st.session_state.get('dataset_name', 'data/reviews.csv')}**")
+        C.kpi_row([("Total reviews", f"{c.info['rows_in_file']:,}", "rows in the file", "navy"),
+                   ("Unique reviews", f"{c.info['rows_available']:,}", f"{c.info['duplicates_dropped']} duplicates removed", "navy"),
+                   ("Applications", c.info["apps"], "government apps", "navy"),
+                   ("Average rating", f"{c.df['rating'].mean():.2f} ★", "full dataset", "navy")])
+    else:
+        C.empty_state("📁", "No dataset loaded", "Upload a CSV, or place the dataset at data/reviews.csv.")
+
+    C.section("2 · Run Multi-Agent Analysis", "Agent 1 → Agent 2 (critique loop, max 2 rounds) → Agent 3, for every selected review")
     with st.container(border=True):
-        a, b = st.columns([3, 2])
-        a.markdown("**Executive report (PDF)** · 10 sections, dark-green identity, Arabic evidence right-to-left, "
-                   "built only from the results below.")
-        if not states:
-            a.caption("Disabled: no reviews have been analysed in this session yet. Run a sample on the Dashboard "
-                      "or analyse a review first; the report never uses invented figures.")
-        if b.button("📄 Generate Executive Report", type="primary", disabled=not states, width="stretch", key="ins_gen"):
-            with st.spinner("Building the PDF…"):
-                st.session_state["ins_pdf"] = (report_pdf.build_executive_report(ins), cov["reviews"], cov["analysis_date"])
-        pdf = st.session_state.get("ins_pdf")
-        if pdf and states:
-            data, n, day = pdf
-            if n != cov["reviews"]:
-                b.caption(f"⚠️ This PDF covers {n} reviews; {cov['reviews']} are analysed now. Generate it again to include them.")
-            b.download_button("⬇️ Download the PDF", data, f"executive_report_{day}.pdf", "application/pdf",
-                              width="stretch", key="ins_dl")
+        a, b, d = st.columns([2, 2, 1])
+        max_n = len(c.df) if c.df is not None else 1
+        n = a.number_input("Number of reviews to analyse", 1, max(max_n, 1), min(10 if c.llm.available else 100, max_n),
+                           step=10, key="run_n", help="LLM mode makes about 3–6 API calls per review.")
+        how = b.radio("Selection", ["Random sample", "First reviews in the file"], key="run_how", horizontal=True)
+        seed = d.number_input("Seed", 0, 9999, 42, key="run_seed", help="Same seed = same random sample.")
+        if st.button("▶ Run Multi-Agent Analysis", type="primary", disabled=c.df is None, key="run_go", width="stretch"):
+            sub = c.df.sample(int(n), random_state=int(seed)) if how == "Random sample" else c.df.head(int(n))
+            states = run_batch_with_progress([row_to_review(r) for _, r in sub.iterrows()], "Analysing")
+            remember(states, "run")
+            st.session_state["last_run"] = _status_counts(states)
+            if states:
+                st.session_state["current_key"] = f"run:{states[-1].review.review_id}"
+        with st.expander("Analyse a single review instead (typed text, example or test scenario)"):
+            _single_review_input(c)
 
-    if not states:
-        C.empty_state("📊", "No analysed feedback yet", "Every number on this page is computed from reviews actually analysed "
-                      "in this session. Run a sample on the Dashboard or analyse a review first.")
-        return
-
-    urgent = sum(n for p, n, _ in ins["priority"] if p in INS.URGENT)
-    hc = sum(n for s_, n, _ in ins["severity"] if s_ in ("High", "Critical"))
-    C.kpi_row([("Reviews analysed", cov["reviews"], f"{cov['apps']} application(s)", "navy"),
-               ("Service issues", cov["issues"], "evidence-backed"),
-               ("High / Critical", hc, "service blocked or disrupted", "crit" if hc else ""),
-               ("P1 / P2", urgent, "require attention first", "warn" if urgent else "")])
-    C.section("Executive summary", "sentences built only from the counts below")
-    for line in ins["summary"]:
-        st.markdown(f"- {line}")
-
-    C.section("Top affected service-quality dimensions", "with the provisional EGSQUAL dimension (Aljukhadar et al., 2022)")
-    if ins["dimensions"]:
-        g1, g2 = st.columns([2, 3])
-        with g1, st.container(border=True):
-            dims = pd.Series([d["name"].split(" (")[0] for d in ins["dimensions"] for _ in range(d["issues"])])
-            st.altair_chart(CH.single_hue_bars(dims, T.TEAL, "Issues"), width="stretch")
-        with g2:
-            st.dataframe(pd.DataFrame([{"dimension": d["name"], "EGSQUAL (provisional)": d["egsqual"] or "—", "issues": d["issues"],
-                                        "share %": d["share"], "High/Critical": d["high_critical"], "P1/P2": d["urgent"],
-                                        "most affected app": f"{d['top_apps'][0][0]} ({d['top_apps'][0][1]})" if d["top_apps"] else "—"}
-                                       for d in ins["dimensions"]]), hide_index=True, width="stretch")
-    else:
-        st.caption("No operational issue was extracted.")
-
-    C.section("Most frequently reported issues", "grouped by topic and dimension · verbatim evidence")
-    if ins["top_issues"]:
-        _rtl_table(pd.DataFrame([{"Issue": t["issue"], "Dimension": t["dimension"], "Issues": t["count"], "P1/P2": t["urgent"],
-                                  "Example evidence": t["examples"][0]["evidence"] if t["examples"] else "",
-                                  "Review": t["examples"][0]["review_id"] if t["examples"] else ""} for t in ins["top_issues"]]),
-                   ("Example evidence",))
-    else:
-        st.caption("No operational issue was extracted.")
-
-    C.section("Feedback across applications", "per application, from analysed reviews only")
-    st.dataframe(pd.DataFrame([{"application": x["app"], "reviews": x["reviews"], "issues": x["issues"],
-                                "High/Critical": x["high_critical"], "P1/P2": x["urgent"], "most affected dimension": x["top_dimension"],
-                                "most frequent issue": x["top_issue"]} for x in ins["by_app"]]), hide_index=True, width="stretch")
-    sev_c = pd.Series([s_ for s_, n, _ in ins["severity"] for _ in range(n)])
-    a_, b_ = st.columns(2)
-    with a_, st.container(border=True):
-        st.markdown("**Severity distribution** · issues (rules R1–R4)")
-        if len(sev_c):
-            st.altair_chart(CH.severity_bars(sev_c), width="stretch")
-    with b_, st.container(border=True):
-        st.markdown("**Priority distribution** · issues (Impact × Urgency matrix)")
-        pr_c = pd.Series([p for p, n, _ in ins["priority"] for _ in range(n)])
-        if len(pr_c):
-            st.altair_chart(CH.priority_bars(pr_c), width="stretch")
-    recurring = [t for t in ins["top_issues"] if t["reviews"] >= 2]
-    if recurring:
-        st.markdown("**Recurring issues** (reported in two or more reviews): "
-                    + "; ".join(f"{t['issue']} — {t['reviews']} reviews in {', '.join(t['apps'])}" for t in recurring[:5]))
-
-    C.section("High-priority feedback requiring attention", f"{len(ins['high_priority'])} issue(s) with priority P1 or P2")
-    if ins["high_priority"]:
-        _rtl_table(pd.DataFrame([{"Priority": r["priority"], "Severity": r["severity"], "Application": r["app"],
-                                  "Issue": r["description"], "Evidence": r["evidence"], "Review": r["review_id"]}
-                                 for r in ins["high_priority"][:25]]), ("Evidence",))
-        if len(ins["high_priority"]) > 25:
-            st.caption(f"Showing 25 of {len(ins['high_priority'])}; the full list is in the Dashboard CSV export.")
-    else:
-        st.caption("No P1/P2 issue in the analysed feedback.")
-
-    C.section("Recommended service improvements", "from Agent 3's decisions; recommendations state their basis")
-    a, b = st.columns([2, 3])
-    with a, st.container(border=True):
-        st.markdown("**Agent 3 actions** (reviews)")
-        st.dataframe(pd.DataFrame(ins["actions"], columns=["action", "reviews", "share %"]), hide_index=True, width="stretch")
-    with b, st.container(border=True):
-        st.markdown("**Management recommendations**")
-        for k, r in enumerate(ins["recommendations"], start=1):
-            st.markdown(f"**{k}. {r['title']}**  \n{r['basis']}")
-    if ins["improvements"]:
-        st.dataframe(pd.DataFrame([{"action": g["action"], "application": g["app"], "dimension": g["dimension"],
-                                    "handling team": g["team"], "tickets": g["tickets"], "P1/P2": g["urgent"],
-                                    "example ticket": g["example_title"]}
-                                   for g in ins["improvements"]]), hide_index=True, width="stretch")
-    st.caption("🛡️ Tickets and escalations are simulated; escalation rules are research-defined. Nothing is sent to any government system.")
+    C.section("3 · Execution status", "how each review was really processed")
+    last = st.session_state.get("last_run")
+    total = _status_counts(analysed() + [s for s in store().values() if s.agent3 is None])
+    if last:
+        st.caption("Last run: " + " · ".join(f"{k}: {v}" for k, v in last.items()))
+    C.kpi_row([("Analysed successfully", sum(v for k, v in total.items() if k != "Failed"), "all runs in this session", "navy"),
+               ("LLM analysis", total["LLM"], "every LLM step succeeded"),
+               ("Rule-based fallback", total["Rule-based fallback"] + total["Rule-based (offline)"],
+                f"{total['Rule-based fallback']} after an LLM failure · {total['Rule-based (offline)']} offline",
+                "warn" if total["Rule-based fallback"] else ""),
+               ("Failed analysis", total["Failed"], "workflow did not complete", "crit" if total["Failed"] else "")])
+    fatal = st.session_state.get("llm_fatal")
+    if fatal:
+        st.error("LLM unavailable: " + fatal, icon="⛔")
+    if store():
+        a, b = st.columns([3, 1])
+        a.caption("Results stay available on every page for this session.")
+        if b.button("Clear all results", key="clear_all", width="stretch"):
+            st.session_state["store"] = {}
+            st.session_state.pop("last_run", None)
+            st.session_state.pop("ins_pdf", None)
+            st.rerun()
+        _goto("agent1", "Next: Agent 1 — Feedback Analysis")
 
 
 # =========================================================================== #
-# 4. Methodology & rules
+# 5. Executive Dashboard (management view, includes Service Quality Insights)
+# =========================================================================== #
+def page_executive() -> None:
+    import insights as INS
+    import report_pdf
+
+    c = ctx()
+    C.hero(config.APP_TITLE_EN, "Executive view of beneficiary feedback and where to act first.", [PROTOTYPE],
+           title_ar=config.APP_TITLE_AR)
+    states = analysed()
+    total = c.info["rows_available"] if c.info else None
+    ins = INS.compute_insights(states, dataset_reviews=total)
+    ins["sla_targets"] = c.sla_targets
+    cov = ins["coverage"]
+
+    C.section("Full dataset", "all reviews in the loaded file")
+    if c.info:
+        C.kpi_row([("Total reviews", f"{c.info['rows_in_file']:,}", "rows in the file", "navy"),
+                   ("Unique reviews", f"{c.info['rows_available']:,}", f"{c.info['duplicates_dropped']} duplicates removed", "navy"),
+                   ("Applications", c.info["apps"], "government apps", "navy"),
+                   ("Average rating", f"{c.df['rating'].mean():.2f} ★", "full dataset", "navy")])
+    C.section("Analysed reviews", "results of the three agents — only reviews actually analysed")
+    if not states:
+        C.empty_state("📊", "No analysis yet — no findings are shown", "Run the analysis on the Data & Run Analysis page.")
+        _goto("data", "Go to Data & Run Analysis")
+        return
+    urgent = sum(n for p, n, _ in ins["priority"] if p in INS.URGENT)
+    C.kpi_row([("Reviews analysed", f"{cov['reviews']:,}", f"coverage {cov['coverage_pct']}% of unique reviews" if cov["coverage_pct"] is not None else "—"),
+               ("Service issues", cov["issues"], "evidence-backed"),
+               ("Actionable feedback", ins["actionable"], f"{ins['actionable'] / cov['reviews'] * 100:.0f}% of analysed reviews"),
+               ("P1 / P2 issues", urgent, "attention first", "warn" if urgent else "")])
+    if not ins["sample_ok"]:
+        st.warning(f"Small sample ({cov['reviews']} review(s)): the findings describe this sample only. Management recommendations "
+                   f"are generated from {ins['min_reviews']} analysed reviews or more.")
+
+    with st.container(border=True):
+        a, b = st.columns([3, 2])
+        a.markdown("**Executive report (PDF, 2–4 pages)** · bilingual headings, built only from the results on this page.")
+        if b.button("📄 Generate Executive Report", type="primary", width="stretch", key="ins_gen"):
+            with st.spinner("Building the PDF…"):
+                st.session_state["ins_pdf"] = (report_pdf.build_executive_report(ins), cov["reviews"], cov["analysis_date"])
+        pdf = st.session_state.get("ins_pdf")
+        if pdf:
+            data, n, day = pdf
+            if n != cov["reviews"]:
+                b.caption(f"This PDF covers {n} reviews; {cov['reviews']} are analysed now — generate it again.")
+            b.download_button("⬇️ Download the PDF", data, f"BeneficiaryVoice_executive_report_{day}.pdf", "application/pdf",
+                              width="stretch", key="ins_dl")
+
+    g1, g2 = st.columns(2)
+    with g1, st.container(border=True):
+        st.markdown("**Most affected service-quality dimensions** (provisional EGSQUAL)")
+        if ins["dimensions"]:
+            st.altair_chart(CH.single_hue_bars(pd.Series([d["name"].split(" (")[0] for d in ins["dimensions"] for _ in range(d["issues"])]),
+                                               T.NAVY, "Issues"), width="stretch")
+        else:
+            st.caption("No operational issue extracted.")
+    with g2, st.container(border=True):
+        st.markdown("**Priority distribution** · Impact × Urgency matrix")
+        pr = pd.Series([p for p, n, _ in ins["priority"] for _ in range(n)])
+        if len(pr):
+            st.altair_chart(CH.priority_bars(pr), width="stretch")
+        else:
+            st.caption("No operational issue extracted.")
+
+    C.section("Most frequently reported issues", "verbatim beneficiary evidence")
+    if ins["top_issues"]:
+        _rtl_table(pd.DataFrame([{"Issue": t["issue"], "Dimension": t["dimension"].split(" (")[0], "Issues": t["count"],
+                                  "P1/P2": t["urgent"], "Example evidence": t["examples"][0]["evidence"] if t["examples"] else ""}
+                                 for t in ins["top_issues"][:5]]), ("Example evidence",))
+    C.section("Improvement opportunities", "from Agent 3's decisions · recommendations state their basis")
+    a, b = st.columns([2, 3])
+    with a, st.container(border=True):
+        st.markdown("**Actionable feedback** (Agent 3 action per review)")
+        st.dataframe(pd.DataFrame(ins["actions"], columns=["action", "reviews", "share %"]), hide_index=True, width="stretch")
+    with b, st.container(border=True):
+        st.markdown("**Management recommendations**")
+        if ins["recommendations"]:
+            for k, r in enumerate(ins["recommendations"], start=1):
+                st.markdown(f"**{k}. {r['title']}**  \n{r['basis']}")
+        else:
+            st.caption(f"Not generated: at least {ins['min_reviews']} analysed reviews are needed (currently {cov['reviews']}).")
+    with st.expander("More service-quality insights: applications, high-priority feedback, dimensions"):
+        st.dataframe(pd.DataFrame([{"application": x["app"], "reviews": x["reviews"], "issues": x["issues"], "P1/P2": x["urgent"],
+                                    "most affected dimension": x["top_dimension"], "most frequent issue": x["top_issue"]}
+                                   for x in ins["by_app"]]), hide_index=True, width="stretch")
+        if ins["high_priority"]:
+            _rtl_table(pd.DataFrame([{"Priority": r["priority"], "Application": r["app"], "Issue": r["description"],
+                                      "Evidence": r["evidence"]} for r in ins["high_priority"][:10]]), ("Evidence",))
+        st.dataframe(pd.DataFrame([{"dimension": d["name"], "EGSQUAL (provisional)": d["egsqual"] or "—", "issues": d["issues"],
+                                    "share %": d["share"], "High/Critical": d["high_critical"], "P1/P2": d["urgent"]}
+                                   for d in ins["dimensions"]]), hide_index=True, width="stretch")
+    st.caption("🛡️ Tickets, SLA targets and escalations are simulated; rules are research-defined. Nothing is sent to any government system.")
+
+
+# =========================================================================== #
+# Settings (secondary)
+# =========================================================================== #
+def page_settings() -> None:
+    from llm import health_check
+
+    c = ctx()
+    C.page_header("⚙️ Settings", "Reasoning engine, review rounds, simulated SLA targets and the Impact × Urgency matrix.")
+    a, b = st.columns(2)
+    with a, st.container(border=True):
+        st.markdown("**Reasoning engine**")
+        providers = ["anthropic", "openai", "offline"]
+        prov = st.selectbox("AI model provider", providers, index=providers.index(st.session_state.get("cfg_provider", "anthropic")))
+        st.session_state["cfg_provider"] = prov
+        st.caption(("🧠 " + c.llm.name) if c.llm.available else ("⚙️ Offline rule-based mode. " + (c.llm.note or "")))
+        if not presentation():
+            s = config.llm_settings_summary()
+            st.caption(f"Anthropic model: {s['anthropic_model']} · key {'set' if s['anthropic_key_set'] else 'not set'} · "
+                       f"OpenAI model: {s['openai_model']} · key {'set' if s['openai_key_set'] else 'not set'} (keys are never shown)")
+        if st.button("Test LLM connection", disabled=not c.llm.available,
+                     help="Sends one tiny request to check the key, model, credit and structured output."):
+            r = health_check(c.llm)
+            st.session_state["llm_fatal"] = "" if r["ok"] else r["message"]
+            (st.success if r["ok"] else st.error)(r["message"])
+        if st.session_state.get("llm_fatal"):
+            st.error("Current status: " + st.session_state["llm_fatal"])
+    with b, st.container(border=True):
+        st.markdown("**Workflow**")
+        st.session_state["cfg_rev"] = st.slider("Max Agent 1 ↔ Agent 2 critique rounds", 0, 2, st.session_state.get("cfg_rev", config.MAX_REVISIONS))
+        st.session_state["cfg_date"] = st.date_input("SLA reference date (complaint-SLA check)", st.session_state.get("cfg_date", c.ref_date))
+        st.session_state["cfg_presentation"] = st.toggle("Management Presentation Mode", st.session_state.get("cfg_presentation", False),
+                                                         help="Hides developer diagnostics; keeps fallback, simulation and limitation labels.")
+    a, b = st.columns(2)
+    with a, st.container(border=True):
+        st.markdown("**Simulated SLA targets** (research-defined, elapsed clock hours)")
+        sla = st.data_editor(pd.DataFrame([{"priority": p, "response_h": v["response_hours"], "resolution_h": v["resolution_hours"]}
+                                           for p, v in c.sla_targets.items()]), key="set_sla", hide_index=True, disabled=["priority"],
+                             width="stretch", column_config={"response_h": st.column_config.NumberColumn(min_value=1, step=1),
+                                                             "resolution_h": st.column_config.NumberColumn(min_value=1, step=1)})
+        st.session_state["cfg_sla"] = {r.priority: {"response_hours": int(r.response_h), "resolution_hours": int(max(r.resolution_h, r.response_h))}
+                                       for r in sla.itertuples()}
+    with b, st.container(border=True):
+        st.markdown("**Impact × Urgency matrix** (rows = impact, columns = urgency)")
+        lv = ["High", "Medium", "Low"]
+        m = st.data_editor(pd.DataFrame([{"impact": i, **c.matrix[i]} for i in lv]), key="set_matrix", hide_index=True,
+                           disabled=["impact"], width="stretch",
+                           column_config={u: st.column_config.SelectboxColumn(u, options=["P1", "P2", "P3", "P4"], required=True) for u in lv})
+        st.session_state["cfg_matrix"] = {r.impact: {u: getattr(r, u) for u in lv} for r in m.itertuples()}
+    if st.button("Reset SLA targets and matrix to the documented defaults"):
+        for k in ("cfg_sla", "cfg_matrix", "set_sla", "set_matrix"):
+            st.session_state.pop(k, None)
+        st.rerun()
+    st.caption("Changes apply to reviews analysed from now on; earlier results keep the settings they were analysed with.")
+
+
+# =========================================================================== #
+# Methodology & References (secondary)
 # =========================================================================== #
 def _egsqual_section() -> None:
     """EGSQUAL subsection: reference, verification status, crosswalk, Arabic examples, mapping rules, limitations."""
@@ -524,9 +475,8 @@ def _egsqual_section() -> None:
 def page_methodology() -> None:
     import json as _json
 
-    C.hero("Methodology & Rules", "How GovFeedback AI decides. Published frameworks inform the design; every scoring rule, "
-           "threshold and SLA value below is research-defined and editable in knowledge_base/.",
-           [PROTOTYPE, "Not official DGA rules", "No compliance claimed"])
+    C.page_header("📘 Methodology & References", "Published frameworks inform the design; every scoring rule, threshold and "
+                  "SLA value is research-defined and editable in knowledge_base/.")
     fw = _json.loads((config.KB_DIR / "frameworks.json").read_text(encoding="utf-8"))
     C.md('<div class="card"><h4>Architecture and collaboration</h4><div class="small">'
          '<b>Agent 1</b> extracts independent issues with verbatim evidence and maps each to a service-quality category. '
@@ -551,8 +501,8 @@ def page_methodology() -> None:
     st.dataframe(pd.DataFrame(sr["severity_rules"]), hide_index=True, width="stretch")
     a, b = st.columns([3, 2])
     with a:
-        st.dataframe(pd.DataFrame(mk["impact_rules"] + mk["urgency_rules"] + [{"id": mk["verification_cap"]["id"], "level": "cap",
-                                                                              "rule": mk["verification_cap"]["rule"]}]),
+        st.dataframe(pd.DataFrame(mk["impact_rules"] + mk["urgency_rules"] + [{"id": mk["verification_rule"]["id"], "level": "cap",
+                                                                              "rule": mk["verification_rule"]["rule"]}]),
                      hide_index=True, width="stretch")
     with b:
         C.matrix_grid(ctx().matrix, caption="Current matrix (default from knowledge_base/impact_urgency_matrix.json; "

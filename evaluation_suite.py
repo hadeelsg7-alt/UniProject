@@ -61,7 +61,14 @@ LABEL_SPEC: dict[str, dict] = {
     "action": {"agent": "Agent3", "values": ACTIONS, "help": "recommended operational action"},
     "ticket": {"agent": "Agent3", "values": YES_NO, "help": "should a ticket be generated? (no only when no action is required)"},
     "escalation": {"agent": "Agent3", "values": YES_NO, "help": "is this a candidate for (simulated) external escalation?"},
+    "issue_count": {"agent": "Agent1", "values": ["0", "1", "2", "3", "4", "5"], "help": "number of independent issues in the review"},
+    "handling_team": {"agent": "Agent3", "values": None, "help": "team that should handle the feedback (see knowledge_base/handling_teams.json)"},
 }
+
+
+def team_names() -> list[str]:
+    kb = tools.handling_teams_kb()
+    return sorted({*kb["by_topic"].values(), *kb["by_dimension"].values(), *kb["by_action"].values(), kb["default"]})
 LABEL_COLUMNS = list(LABEL_SPEC)
 FAILED = "FAILED"  # prediction placeholder when a system produced no output for a review
 
@@ -153,6 +160,14 @@ def normalise_label(field_name: str, v):
         return _dimension_keys(v)
     if field_name == "action":
         return _action_code(v)
+    if field_name == "issue_count":
+        try:
+            n = int(float(str(v).strip()))
+        except ValueError:
+            return None
+        return str(n) if 0 <= n <= 20 else None
+    if field_name == "handling_team":
+        return next((t for t in team_names() if _key(t) == _key(v)), None)
     table = _SYN["yesno"] if field_name in ("ticket", "escalation") else _SYN.get(field_name, {})
     return table.get(_key(v))
 
@@ -235,7 +250,8 @@ def annotation_guidelines() -> str:
              "Leave a cell empty if you cannot decide; empty cells are excluded from that metric.",
              "Ideally two annotators label independently and disagreements are resolved before upload.", ""]
     for f, spec in LABEL_SPEC.items():
-        vals = spec["values"] if spec["values"] else [f"{k} ({d['name_en']})" for k, d in kb.items()] + ["NONE"]
+        vals = (spec["values"] or (team_names() if f == "handling_team"
+                                   else [f"{k} ({d['name_en']})" for k, d in kb.items()] + ["NONE"]))
         lines.append(f"## {f}  ·  {spec['agent']}")
         lines.append(spec["help"])
         lines.append("Allowed values: " + ", ".join(vals))
@@ -255,7 +271,8 @@ def annotation_guidelines() -> str:
 UNREVIEWED = "AI-drafted (not reviewed)"
 VERIFIED = "human-verified"
 _DROPDOWNS = {"feedback_type": FEEDBACK_TYPES, "sentiment": SENTIMENTS, "severity": SEVERITIES, "priority": PRIORITIES,
-              "action": ACTIONS, "ticket": YES_NO, "escalation": YES_NO, "label_source": [UNREVIEWED, VERIFIED]}
+              "action": ACTIONS, "ticket": YES_NO, "escalation": YES_NO, "label_source": [UNREVIEWED, VERIFIED],
+              "issue_count": [str(n) for n in range(6)], "handling_team": team_names()}
 
 
 def build_review_workbook(labels: pd.DataFrame, rationale: dict[str, str] | None = None) -> bytes:
@@ -391,6 +408,11 @@ class Prediction:
     output_tokens: int = 0
     llm_calls: int = 0
     used_fallback: bool = False
+    issue_count: Optional[str] = None
+    handling_team: Optional[str] = None
+    review_requests: int = 0
+    revision_rounds: int = 0
+    consistency: dict = field(default_factory=dict)  # label-free behavioural checks (multi-agent only)
     error: Optional[str] = None
 
     @property
@@ -443,6 +465,13 @@ def predictions_from_state(state: WorkflowState, system: str = "multi_agent") ->
     p.escalation = "yes" if a3.escalation.status == EscalationStatus.CANDIDATE_AWAITING_HUMAN_APPROVAL else "no"
     p.ticket_json = a3.ticket.model_dump_json() if a3.ticket is not None else None
     p.evidence = [i.evidence for i in a1.issues]
+    p.issue_count = str(len(a1.issues))
+    p.handling_team = a3.handling_team or None
+    p.review_requests = sum(m.message_type == "REVIEW_REQUEST" for m in state.messages)
+    p.revision_rounds = state.revision_count
+    from evaluation import behavioural_checks
+    p.consistency = {c.check: c.passed for c in behavioural_checks(state)
+                     if c.check in CONSISTENCY_CHECKS}
     if state.errors:
         p.error = "; ".join(state.errors)
     return p
@@ -564,9 +593,42 @@ def confusion(y_true: list, y_pred: list) -> pd.DataFrame:
             .value_counts().rename("count").reset_index())
 
 
+CONSISTENCY_CHECKS = {
+    "issues_supported_by_review": "Every issue's evidence quote occurs in the review",
+    "severity_priority_follow_rules": "Severity and priority match rules R1–R4 and the Impact × Urgency matrix",
+    "escalation_follows_evidence": "Escalation status is consistent with the complaint evidence (nothing invented)",
+    "ticket_required_fields": "Generated tickets carry every required field",
+}
+
+
+def _produced(preds, f: str) -> list:
+    """Predictions from systems that actually output field f (baselines do not output every field)."""
+    return [p for p in preds if p.failed or getattr(p, f) is not None]
+
+
 def agent1_metrics(labels, preds) -> dict:
     return {"feedback_type": multiclass(*_pairs(labels, preds, "feedback_type")),
-            "dimensions": multilabel(*_pairs(labels, preds, "dimensions"))}
+            "dimensions": multilabel(*_pairs(labels, preds, "dimensions")),
+            "issue_count": multiclass(*_pairs(labels, _produced(preds, "issue_count"), "issue_count"))}
+
+
+def consistency_rates(preds) -> pd.DataFrame:
+    """Label-free decision-consistency checks over the analysed reviews (multi-agent predictions only)."""
+    rows = []
+    for k, desc in CONSISTENCY_CHECKS.items():
+        vals = [p.consistency.get(k) for p in preds if p.consistency]
+        app = [v for v in vals if v is not None]
+        rows.append({"check": desc, "applicable reviews": len(app), "passed": sum(app),
+                     "rate": round(sum(app) / len(app), 3) if app else None})
+    return pd.DataFrame(rows)
+
+
+def collaboration_summary(preds) -> dict:
+    ma = [p for p in preds if not p.failed]
+    return {"reviews": len(ma), "with_review_request": sum(p.review_requests > 0 for p in ma),
+            "review_requests": sum(p.review_requests for p in ma), "revision_rounds": sum(p.revision_rounds for p in ma),
+            "max_rounds_used": max([p.revision_rounds for p in ma] or [0]),
+            "llm_fallback_reviews": sum(p.used_fallback for p in ma)}
 
 
 def agent2_metrics(labels, preds, reviews: dict[str, ReviewInput] | None = None) -> dict:
@@ -596,6 +658,7 @@ def agent3_metrics(labels, preds) -> dict:
     return {"ticket": binary(*_pairs(labels, preds, "ticket")),
             "escalation": binary(*_pairs(labels, preds, "escalation")),
             "action": multiclass(*_pairs(labels, preds, "action")),
+            "routing": multiclass(*_pairs(labels, _produced(preds, "handling_team"), "handling_team")),
             "json_valid": sum(1 for c in checks if c[1]), "json_total": len(checks),
             "json_validity_rate": (sum(1 for c in checks if c[1]) / len(checks)) if checks else None,
             "json_checks": pd.DataFrame(checks, columns=["review_id", "valid", "detail"])}

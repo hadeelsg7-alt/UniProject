@@ -12,17 +12,19 @@ from collections import Counter, defaultdict
 from datetime import date
 from typing import Optional
 
+import config
 import lexicon as lx
 import tools
 from evaluation_suite import sentiment_class
 from schemas import SEVERITY_ORDER, ActionType, EscalationStatus, WorkflowState
+from workflow import execution_status
 
 PRIORITIES = ["P1", "P2", "P3", "P4"]
 SEVERITIES = ["Critical", "High", "Medium", "Low"]
 SENTIMENTS = ["Negative", "Neutral", "Positive"]
 FEEDBACK_TYPES = ["Bug", "General Complaint", "Suggestion", "Inquiry", "Praise"]
 URGENT = {"P1", "P2"}
-PROTOTYPE_LABEL = "Research Prototype — Proposed Decision-Support Solution"
+PROTOTYPE_LABEL = config.PROTOTYPE_LABEL
 
 
 def _pct(n: int, d: int) -> float:
@@ -54,8 +56,11 @@ def issue_rows(states: list[WorkflowState]) -> list[dict]:
     return rows
 
 
-def compute_insights(states: list[WorkflowState], analysis_date: Optional[date] = None) -> dict:
+def compute_insights(states: list[WorkflowState], analysis_date: Optional[date] = None,
+                     dataset_reviews: Optional[int] = None) -> dict:
+    """`dataset_reviews` = unique reviews in the loaded dataset, used for the coverage percentage."""
     done = [s for s in states if s.agent1 and s.agent2 and s.agent3]
+    exec_counts = Counter(execution_status(s) for s in states)
     rows = issue_rows(done)
     n_rev, n_iss = len(done), len(rows)
     kb = tools.egsqual_kb()
@@ -149,7 +154,12 @@ def compute_insights(states: list[WorkflowState], analysis_date: Optional[date] 
                      "llm_fallback_reviews": sum(any(e.action == "LLM_FALLBACK" for e in s.decision_log) for s in done),
                      "multi_issue_reviews": sum(len(s.agent1.issues) >= 2 for s in done),
                      "needs_clarification": sum(s.agent1.is_ambiguous for s in done),
-                     "revision_requests": sum(m.message_type == "REVIEW_REQUEST" for s in done for m in s.messages)},
+                     "revision_requests": sum(m.message_type == "REVIEW_REQUEST" for s in done for m in s.messages),
+                     "dataset_reviews": dataset_reviews,
+                     "coverage_pct": round(100 * n_rev / dataset_reviews, 2) if dataset_reviews else None,
+                     "execution": {k: exec_counts.get(k, 0) for k in ("LLM", "Rule-based fallback", "Rule-based (offline)", "Failed")}},
+        "sample_ok": n_rev >= config.MIN_REVIEWS_FOR_RECOMMENDATIONS,
+        "min_reviews": config.MIN_REVIEWS_FOR_RECOMMENDATIONS,
         "feedback_types": [(t, types.get(t, 0), _pct(types.get(t, 0), n_rev)) for t in FEEDBACK_TYPES],
         "sentiment": [(t, senti.get(t, 0), _pct(senti.get(t, 0), n_rev)) for t in SENTIMENTS],
         "severity": [(t, sev.get(t, 0), _pct(sev.get(t, 0), n_iss)) for t in SEVERITIES],
@@ -162,7 +172,7 @@ def compute_insights(states: list[WorkflowState], analysis_date: Optional[date] 
         "teams": teams.most_common(),
         "actionable": sum(s.agent3.action != ActionType.NO_ACTION for s in done),
     }
-    ins["recommendations"] = management_recommendations(ins)
+    ins["recommendations"] = management_recommendations(ins) if ins["sample_ok"] else []
     ins["summary"] = executive_summary(ins)
     return ins
 
@@ -223,4 +233,7 @@ def executive_summary(ins: dict) -> list[str]:
     out.append(f"{neg} review(s) ({_pct(neg, cov['reviews'])}%) were negative in tone; tone is reported separately and never raises severity.")
     out.append(f"Agent 3 generated {ins['tickets']} simulated ticket(s); {len(ins['escalation_candidates'])} simulated escalation "
                "candidate(s) await human approval. Nothing was submitted to any government system.")
+    if not ins["sample_ok"]:
+        out.append(f"Only {cov['reviews']} review(s) were analysed: these findings describe the sample, not the organisation. "
+                   f"Management recommendations need at least {ins['min_reviews']} analysed reviews.")
     return out

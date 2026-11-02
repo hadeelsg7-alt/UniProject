@@ -125,11 +125,12 @@ def test_pdf_report_sections_numbers_label_and_arabic(states):
     assert data[:4] == b"%PDF"
     reader = PdfReader(io.BytesIO(data))
     text = "\n".join(p.extract_text() for p in reader.pages)
-    for title in ["Executive Summary", "Dataset Coverage", "Key Service Quality Indicators", "Top Reported Issues",
-                  "Priority Distribution", "Service Quality Insights (EGSQUAL)", "Recommended Improvement Actions",
-                  "Simulated SLA and Escalation Summary", "Management Recommendations", "Methodology and Limitations"]:
+    for title in ["Executive Summary", "Dataset and Analysis Coverage", "Key Service-Quality Findings", "Top Five Reported Issues",
+                  "Priority Distribution", "Most Affected EGSQUAL Dimensions", "Recommended Improvement Actions",
+                  "Simulated Escalation Summary", "Management Recommendations", "Research Limitations"]:
         assert title in text, title
-    assert INS.PROTOTYPE_LABEL in text and "RESEARCH-DEFINED SIMULATION" in text
+    assert INS.PROTOTYPE_LABEL in text and "BeneficiaryVoice AI" in text
+    assert 2 <= len(reader.pages) <= 4  # concise executive report
     cov = ins["coverage"]
     assert f"{cov['reviews']} beneficiary reviews" in text  # same number as the page
     assert re.search(r"[؀-ۿﭐ-﻿]", text)  # Arabic evidence is embedded as real text
@@ -142,31 +143,47 @@ def test_rtl_detection():
     assert report_pdf.is_arabic("R0001 التطبيق لا يعمل")
 
 
-def test_insights_page_renders_with_real_results(states, monkeypatch):
-    """Render the Service Quality Insights page headlessly with analysed results (catches UI crashes)."""
+def _exec_script():
+    from datetime import date
+
+    import streamlit as st
+
+    import tools
+    from llm import LLMClient
+    from ui import pages as P
+    from workflow import MultiAgentWorkflow
+
+    llm = LLMClient(provider="offline")
+    st.session_state["ctx"] = P.Ctx(llm=llm, workflow=MultiAgentWorkflow(llm), df=None, info=None, ref_date=date(2026, 1, 1),
+                                    matrix=tools.priority_matrix_kb()["matrix"], sla_targets=tools.sla_targets_kb()["targets"])
+    P.page_executive()
+
+
+def test_executive_dashboard_generates_the_report(states):
+    """The Executive Dashboard (with the merged insights) renders and builds the PDF from real results."""
     from streamlit.testing.v1 import AppTest
 
-    def page():
-        from ui import pages as P
-        P.page_insights()
-
-    at = AppTest.from_function(page)
+    at = AppTest.from_function(_exec_script)
     at.session_state["store"] = {f"t:{s.review.review_id}": s for s in states}
     at.run(timeout=60)
     assert not at.exception
-    assert any(b.label == "📄 Generate Executive Report" and not b.disabled for b in at.button)
     at.button(key="ins_gen").click().run(timeout=60)
     assert not at.exception and "ins_pdf" in at.session_state
+    assert "Not generated" in " ".join(c.value for c in at.caption)  # 7 reviews: no management recommendations
 
 
-def test_insights_page_disables_report_without_results():
+def test_executive_dashboard_offers_no_report_without_results():
     from streamlit.testing.v1 import AppTest
 
-    def page():
-        from ui import pages as P
-        P.page_insights()
-
-    at = AppTest.from_function(page)
+    at = AppTest.from_function(_exec_script)
     at.run(timeout=60)
     assert not at.exception
-    assert at.button(key="ins_gen").disabled
+    assert not [b for b in at.button if b.key == "ins_gen"]  # nothing to report: no button, an explanation instead
+
+
+def test_small_samples_get_no_management_recommendations(states):
+    ins = INS.compute_insights(states)
+    assert not ins["sample_ok"] and ins["recommendations"] == []
+    assert any("Management recommendations need at least" in line for line in ins["summary"])
+    text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(report_pdf.build_executive_report(ins))).pages)
+    assert "Not generated" in text

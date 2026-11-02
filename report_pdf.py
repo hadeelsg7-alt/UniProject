@@ -38,7 +38,7 @@ class ExecutiveReport(FPDF):
         self.add_font("DV", "B", str(FONT_DIR / "DejaVuSans-Bold.ttf"))
         self.set_auto_page_break(True, margin=18)
         self.set_margins(16, 16, 16)
-        self.set_title("Service Quality Executive Report")
+        self.set_title(f"{config.APP_NAME} — Executive Report")
         self.set_author("Research prototype (multi-agent feedback analysis)")
         self.set_text_shaping(True, direction="ltr")
         self.cover = True
@@ -51,7 +51,7 @@ class ExecutiveReport(FPDF):
         self.rect(0, 0, self.w, 9, "F")
         self._font(7.5, color=WHITE)
         self.set_xy(16, 2.6)
-        self.cell(0, 4, "Service Quality Executive Report  ·  Saudi government mobile applications")
+        self.cell(0, 4, f"{config.APP_TITLE_EN}  ·  Executive Report")
         self.set_y(16)
 
     def footer(self):
@@ -86,20 +86,28 @@ class ExecutiveReport(FPDF):
             self.multi_cell(self.w - self.l_margin - self.r_margin - 5, 5.2, it, new_x="LMARGIN", new_y="NEXT")
             self.ln(0.8)
 
-    def section(self, num: int, title: str, subtitle: str = ""):
-        if self.get_y() > self.h - 60:
+    def section(self, num: int, title: str, title_ar: str = "", subtitle: str = ""):
+        if self.get_y() > self.h - 45:
             self.add_page()
-        self.ln(3)
-        self.set_fill_color(*ACCENT)
-        self.rect(self.l_margin, self.get_y() + 0.8, 1.6, 6.2, "F")
-        self.set_x(self.l_margin + 4)
-        self._font(13, True, GREEN)
-        self.cell(0, 8, f"{num}. {title}", new_x="LMARGIN", new_y="NEXT")
-        if subtitle:
-            self._font(8.5, color=MUTED)
-            self.set_x(self.l_margin + 4)
-            self.multi_cell(0, 4.5, subtitle, new_x="LMARGIN", new_y="NEXT")
         self.ln(2)
+        y = self.get_y()
+        self.set_fill_color(*ACCENT)
+        self.rect(self.l_margin, y + 0.8, 1.4, 5.6, "F")
+        self.set_xy(self.l_margin + 3.5, y)
+        self._font(11.5, True, GREEN)
+        self.cell(110, 7, f"{num}. {title}")
+        if title_ar:
+            self.set_text_shaping(True, direction="rtl")
+            self._font(10.5, True, ACCENT)
+            self.set_xy(self.l_margin, y)
+            self.cell(self.w - self.l_margin - self.r_margin, 7, title_ar, align="R")
+            self.set_text_shaping(True, direction="ltr")
+        self.set_xy(self.l_margin, y + 7.5)
+        if subtitle:
+            self._font(8, color=MUTED)
+            self.set_x(self.l_margin + 3.5)
+            self.multi_cell(0, 4.2, subtitle, new_x="LMARGIN", new_y="NEXT")
+        self.ln(1)
 
     def note(self, text: str, fill=TINT, border=ACCENT):
         x, w = self.l_margin, self.w - self.l_margin - self.r_margin
@@ -171,7 +179,7 @@ class ExecutiveReport(FPDF):
     # ---- horizontal bar chart -----------------------------------------------
     def hbars(self, title: str, items: list[tuple[str, int, tuple]], unit: str = ""):
         """items: (label, value, rgb). Bars scale to the largest value; values printed at the bar end."""
-        label_w, bar_h, gap = 52, 5, 2.2
+        label_w, bar_h, gap = 52, 4.2, 1.6
         h = 8 + len(items) * (bar_h + gap)
         if self.get_y() + h > self.h - 20:
             self.add_page()
@@ -220,194 +228,116 @@ def _kpis(pdf: ExecutiveReport, items: list[tuple[str, str, str]]):
 
 
 def build_executive_report(ins: dict) -> bytes:
-    """Render the 10-section executive report. Raises ValueError when nothing has been analysed."""
+    """Concise (2-4 page) bilingual executive report. Raises ValueError when nothing has been analysed."""
     cov = ins["coverage"]
     if cov["reviews"] == 0:
         raise ValueError("No analysed reviews: run an analysis before generating the report.")
     pdf = ExecutiveReport(ins["label"])
     pdf.alias_nb_pages()
+    pdf.set_auto_page_break(True, margin=16)
     urgent = sum(c for p, c, _ in ins["priority"] if p in ("P1", "P2"))
-    hc = sum(c for s, c, _ in ins["severity"] if s in ("High", "Critical"))
+    hc = sum(c for s_, c, _ in ins["severity"] if s_ in ("High", "Critical"))
 
-    # ---- cover ---------------------------------------------------------------
+    # ---- title band (page 1) -----------------------------------------------------
     pdf.add_page()
     pdf.set_fill_color(*GREEN)
-    pdf.rect(0, 0, pdf.w, 112, "F")
+    pdf.rect(0, 0, pdf.w, 46, "F")
     pdf.set_fill_color(*ACCENT)
-    pdf.rect(0, 112, pdf.w, 2.5, "F")
-    pdf.set_xy(16, 26)
-    pdf._font(9, True, (190, 226, 205))
-    pdf.cell(0, 6, "EXECUTIVE REPORT", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_x(16)
-    pdf._font(23, True, WHITE)
-    pdf.multi_cell(170, 10.5, "Beneficiary Feedback and Digital Service Quality", align="L", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(1)
+    pdf.rect(0, 46, pdf.w, 1.6, "F")
+    pdf.set_xy(16, 9)
+    pdf._font(16, True, WHITE)
+    pdf.cell(0, 8, config.APP_TITLE_EN, new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_shaping(True, direction="rtl")
-    pdf._font(14, True, WHITE)
+    pdf._font(12, True, (214, 236, 223))
     pdf.set_x(16)
-    pdf.multi_cell(pdf.w - 32, 8, "تقرير تنفيذي عن ملاحظات المستفيدين وجودة الخدمات الرقمية", align="R", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(pdf.w - 32, 7, config.APP_TITLE_AR, align="R", new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_shaping(True, direction="ltr")
-    pdf.ln(3)
-    pdf.set_x(16)
-    pdf._font(10, color=(214, 236, 223))
-    pdf.multi_cell(170, 5.5, "Saudi government mobile applications · analysed by a three-agent decision-support framework",
-                   align="L", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
-    label_w = pdf.get_string_width(ins["label"]) + 10
+    pdf.set_xy(16, 27)
+    pdf._font(9, color=(214, 236, 223))
+    pdf.cell(0, 5, f"Executive report on beneficiary feedback · analysis date {cov['analysis_date']}", new_x="LMARGIN", new_y="NEXT")
+    lw = pdf.get_string_width(ins["label"]) + 8
     pdf.set_fill_color(*ACCENT)
-    pdf.rect(16, pdf.get_y(), label_w, 8, "F")
-    pdf.set_x(16)
-    pdf._font(8.5, True, WHITE)
-    pdf.cell(label_w, 8, ins["label"], align="C", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_y(124)
+    pdf.rect(16, 35, lw, 6.5, "F")
+    pdf.set_xy(16, 35)
+    pdf._font(8, True, WHITE)
+    pdf.cell(lw, 6.5, ins["label"], align="C")
+    pdf.set_y(53)
     _kpis(pdf, [("Reviews analysed", f"{cov['reviews']:,}", f"{cov['apps']} application(s)"),
                 ("Service issues", f"{cov['issues']:,}", "evidence-backed"),
                 ("High / Critical", f"{hc:,}", "service blocked or disrupted"),
-                ("P1 / P2", f"{urgent:,}", "require attention first")])
-    pdf._font(9, color=MUTED)
-    pdf.multi_cell(0, 5, f"Analysis date: {cov['analysis_date']}   ·   Reasoning engine: {', '.join(cov['engines'])}",
-                   new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(4)
-    pdf.note("All figures in this report are counts over the reviews actually analysed by the prototype. They describe what the "
-             "framework found; they are not accuracy measurements. Tickets and escalations are simulated: nothing was submitted "
-             "to AMER, the DGA or any government system.")
-    pdf.cover = False
+                ("P1 / P2", f"{urgent:,}", "attention first")])
 
-    # ---- 1 Executive summary ---------------------------------------------------
-    pdf.add_page()
-    pdf.section(1, "Executive Summary")
-    pdf.bullets(ins["summary"])
+    pdf.section(1, "Executive Summary", "الملخص التنفيذي")
+    pdf.bullets(ins["summary"], size=8.8)
 
-    # ---- 2 Dataset coverage ----------------------------------------------------
-    pdf.section(2, "Dataset Coverage")
-    pdf.table_rows(["Measure", "Value"], [
-        ["Reviews analysed", f"{cov['reviews']:,}"], ["Applications covered", cov["apps"]],
-        ["Service issues extracted", f"{cov['issues']:,}"], ["Analysis date", cov["analysis_date"]],
-        ["Reasoning engine", ", ".join(cov["engines"])],
-        ["Reviews with two or more issues", cov["multi_issue_reviews"]],
-        ["Reviews needing clarification", cov["needs_clarification"]],
-        ["Inter-agent review requests", cov["revision_requests"]],
-        ["Reviews where an LLM step fell back to rules", cov["llm_fallback_reviews"]],
-        ["Synthetic test reviews included", cov["synthetic_reviews"]],
-    ], [3, 2])
-    if cov["top_apps"]:
-        pdf.table_rows(["Application", "Reviews analysed"], [[a, n] for a, n in cov["top_apps"]], [4, 1.4], aligns=["L", "C"])
+    pdf.section(2, "Dataset and Analysis Coverage", "البيانات ونطاق التحليل")
+    ex = cov["execution"]
+    pdf.table_rows(["Unique reviews in dataset", "Reviews analysed", "Coverage", "Apps", "Execution (LLM / fallback / offline / failed)"],
+                   [[f"{cov['dataset_reviews']:,}" if cov.get("dataset_reviews") else "—", f"{cov['reviews']:,}",
+                     f"{cov['coverage_pct']}%" if cov.get("coverage_pct") is not None else "—", cov["apps"],
+                     f"{ex['LLM']} / {ex['Rule-based fallback']} / {ex['Rule-based (offline)']} / {ex['Failed']}"]],
+                   [1.6, 1.3, 1, 1.1, 3], size=8, aligns=["C", "C", "C", "C", "C"])
 
-    # ---- 3 Key indicators --------------------------------------------------------
-    pdf.section(3, "Key Service Quality Indicators",
-                "Feedback type and sentiment are per review; severity and dimensions are per extracted issue.")
-    pdf.hbars("Feedback type (reviews)", [(t, c, ACCENT) for t, c, _ in ins["feedback_types"]])
-    pdf.hbars("Sentiment of the text (reviews; reported separately from severity)",
-              [(t, c, {"Negative": (208, 59, 59), "Neutral": (150, 165, 158), "Positive": (12, 163, 12)}[t]) for t, c, _ in ins["sentiment"]])
-    pdf.hbars("Operational severity (issues)", [(t, c, SEV_COL[t]) for t, c, _ in ins["severity"]])
-    if ins["dimensions"]:
-        pdf.hbars("Affected service-quality dimensions (issues)", [(d["name"].split(" (")[0], d["issues"], GREEN_2) for d in ins["dimensions"]])
+    pdf.section(3, "Key Service-Quality Findings", "أبرز نتائج جودة الخدمة")
+    pdf.hbars("Feedback type (reviews)", [(t, c, ACCENT) for t, c, _ in ins["feedback_types"] if c])
+    pdf.hbars("Operational severity (issues; rules R1–R4)", [(t, c, SEV_COL[t]) for t, c, _ in ins["severity"]])
 
-    # ---- 4 Top reported issues ---------------------------------------------------
-    pdf.section(4, "Top Reported Issues", "Issues grouped by topic and dimension, with verbatim beneficiary evidence.")
+    pdf.section(4, "Top Five Reported Issues", "المشكلات الخمس الأكثر تكرارا")
     if ins["top_issues"]:
-        rows = []
-        for t in ins["top_issues"]:
-            ex = t["examples"][0] if t["examples"] else {"evidence": "", "review_id": ""}
-            rows.append([t["issue"], t["dimension"], t["count"], t["urgent"], ex["evidence"], ex["review_id"]])
-        pdf.table_rows(["Issue", "Dimension", "Issues", "P1/P2", "Example evidence (Arabic)", "Review"], rows,
-                       [2.5, 2.3, 1.2, 1.2, 4.0, 1.3], aligns=["L", "L", "C", "C", "R", "L"])
+        pdf.table_rows(["Issue", "Dimension", "Issues", "P1/P2", "Example evidence (Arabic)"],
+                       [[t["issue"], t["dimension"].split(" (")[0], t["count"], t["urgent"],
+                         t["examples"][0]["evidence"] if t["examples"] else ""] for t in ins["top_issues"][:5]],
+                       [2.4, 1.9, 0.9, 0.9, 4.6], size=7.8, aligns=["L", "L", "C", "C", "R"])
     else:
-        pdf.para("No operational issue was extracted from the analysed reviews.")
+        pdf.para("No operational issue was extracted from the analysed reviews.", size=9)
 
-    # ---- 5 Priority ------------------------------------------------------------
-    pdf.section(5, "Priority Distribution", "Assigned by Agent 2's research-defined Impact x Urgency matrix (ITIL 4-informed); "
-                "never by tone or star rating.")
+    pdf.section(5, "Priority Distribution", "توزيع الأولويات",
+                "Research-defined Impact × Urgency matrix informed by ITIL 4 (not prescribed by it). Missing information "
+                "never lowers a priority; such cases are marked provisional for human verification.")
     pdf.hbars("Issues by priority", [(p, c, PRIO_COL[p]) for p, c, _ in ins["priority"]])
-    mk = tools.priority_matrix_kb()
-    pdf.table_rows(["Impact (row) / Urgency (column)", "High", "Medium", "Low"],
-                   [[f"Impact {i}"] + [mk["matrix"][i][u] for u in ("High", "Medium", "Low")] for i in ("High", "Medium", "Low")],
-                   [2, 1, 1, 1], aligns=["L", "C", "C", "C"])
-    pdf.table_rows(["Rule", "Definition"], [[r["id"], f"{r['level']}: {r['rule']}"] for r in mk["impact_rules"] + mk["urgency_rules"]]
-                   + [[mk["verification_cap"]["id"], mk["verification_cap"]["rule"]]], [1, 6])
-    if ins["high_priority"]:
-        hp = ins["high_priority"][:12]
-        pdf.para(f"High-priority feedback requiring attention (showing {len(hp)} of {len(ins['high_priority'])} P1/P2 issues):",
-                 size=9, bold=True, color=GREEN)
-        pdf.ln(1)
-        pdf.table_rows(["Priority", "Severity", "Application", "Issue", "Evidence (Arabic)"],
-                       [[r["priority"], r["severity"], r["app"], r["description"], r["evidence"]] for r in hp],
-                       [1.4, 1.6, 2, 2.8, 4.0], aligns=["C", "C", "L", "L", "R"])
 
-    # ---- 6 EGSQUAL insights --------------------------------------------------------
-    ref = tools.egsqual_reference()
-    pdf.section(6, "Service Quality Insights (EGSQUAL)",
-                f"Operational categories with their provisional EGSQUAL dimension (Aljukhadar et al., {ref['citation']['year']}).")
+    pdf.section(6, "Most Affected EGSQUAL Dimensions", "أبعاد جودة الخدمة الأكثر تأثرا",
+                "Operational categories with a provisional EGSQUAL dimension (Aljukhadar et al., 2022); definitions not yet verified.")
     if ins["dimensions"]:
-        pdf.table_rows(["Dimension", "EGSQUAL (provisional)", "Issues", "Share", "High/Crit.", "P1/P2", "Most affected app"],
-                       [[d["name"], d["egsqual"] or "—", d["issues"], f"{d['share']}%", d["high_critical"], d["urgent"],
-                         f"{d['top_apps'][0][0]} ({d['top_apps'][0][1]})" if d["top_apps"] else "—"] for d in ins["dimensions"]],
-                       [2.5, 2.0, 1.2, 1.2, 1.6, 1.2, 2.3], aligns=["L", "L", "C", "C", "C", "C", "L"])
-        ex_rows = [[d["name"], e["evidence"], e["review_id"]] for d in ins["dimensions"][:4] for e in d["examples"][:1]]
-        if ex_rows:
-            pdf.table_rows(["Dimension", "Supporting evidence (Arabic)", "Review"], ex_rows, [2.4, 5.5, 1.1], aligns=["L", "R", "L"])
-    pdf.note("The mapping to EGSQUAL is provisional: the dimension names come from the authors' abstract, and the definitions have "
-             "not yet been verified against the full paper. EGSQUAL was developed to measure the quality of governmental websites; "
-             "here it is adapted as a coding frame for Arabic app reviews.")
+        pdf.table_rows(["Dimension", "EGSQUAL (provisional)", "Issues", "Share", "P1/P2", "Most affected app"],
+                       [[d["name"].split(" (")[0], d["egsqual"] or "—", d["issues"], f"{d['share']}%", d["urgent"],
+                         d["top_apps"][0][0] if d["top_apps"] else "—"] for d in ins["dimensions"][:5]],
+                       [2.2, 2.1, 0.9, 0.9, 0.9, 2.6], size=7.8, aligns=["L", "L", "C", "C", "C", "L"])
 
-    # ---- 7 Improvement actions ----------------------------------------------------
-    pdf.section(7, "Recommended Improvement Actions", "Derived from Agent 3's decisions on each review.")
-    pdf.table_rows(["Agent 3 action", "Reviews", "Share"], [[a, c, f"{p}%"] for a, c, p in ins["actions"]], [5, 1, 1],
-                   aligns=["L", "C", "C"])
+    pdf.section(7, "Recommended Improvement Actions", "إجراءات التحسين المقترحة", "Derived from Agent 3's decisions on each review.")
     if ins["improvements"]:
-        pdf.table_rows(["Action", "Application", "Dimension", "Handling team", "Tickets", "P1/P2", "Example ticket"],
-                       [[g["action"], g["app"], g["dimension"], g["team"], g["tickets"], g["urgent"], g["example_title"]]
-                        for g in ins["improvements"]],
-                       [2.2, 1.7, 1.9, 1.9, 1.2, 1.1, 2.8], aligns=["L", "L", "L", "L", "C", "C", "L"])
+        pdf.table_rows(["Action", "Application", "Handling team", "Tickets", "P1/P2"],
+                       [[g["action"], g["app"], g["team"], g["tickets"], g["urgent"]] for g in ins["improvements"][:5]],
+                       [2.6, 2.2, 2.6, 0.9, 0.9], size=7.8, aligns=["L", "L", "L", "C", "C"])
 
-    # ---- 8 SLA and escalation ----------------------------------------------------
-    pdf.section(8, "Simulated SLA and Escalation Summary")
-    pdf.note("RESEARCH-DEFINED SIMULATION. Escalation rules E1–E5 and the SLA values are proposed research rules, not official rules "
-             "of the DGA or the AMER / Balaagh Digital service. Every escalation requires human approval, and nothing is submitted.",
-             fill=(255, 247, 230), border=(201, 126, 0))
+    pdf.section(8, "Simulated Escalation Summary", "ملخص التصعيد (محاكاة)")
     sla = ins.get("sla_targets") or tools.sla_targets_kb()["targets"]
-    pdf.table_rows(["Priority", "Simulated response target", "Simulated resolution target"],
-                   [[p, f"{sla[p]['response_hours']} h", f"{sla[p]['resolution_hours']} h"] for p in ("P1", "P2", "P3", "P4") if p in sla],
-                   [1, 2, 2], aligns=["C", "C", "C"])
-    pdf.table_rows(["Escalation status", "Reviews"], [[s, c] for s, c in ins["escalation"]], [5, 1], aligns=["L", "C"])
-    if ins["escalation_candidates"]:
-        pdf.table_rows(["Review", "Application", "Complaint ref.", "SLA deadline", "Days overdue"],
-                       [[c["review_id"], c["app"], c["reference"], c["sla_deadline"], c["days_overdue"]] for c in ins["escalation_candidates"]],
-                       [1.2, 2.2, 1.8, 1.6, 1.2])
-    if ins["escalation_pending"]:
-        pdf.table_rows(["Review", "Application", "Missing to verify the complaint"],
-                       [[p["review_id"], p["app"], p["missing"]] for p in ins["escalation_pending"]], [1.2, 2.2, 4.6])
-    pdf.table_rows(["Rule", "Escalation eligibility (proposed)"], [[r["id"], r["description"]] for r in tools.escalation_rules_kb()["rules"]], [1, 7])
+    esc = dict(ins["escalation"])
+    pdf.para(f"Escalation candidates awaiting human approval: {len(ins['escalation_candidates'])} · complaint mentioned but "
+             f"unverifiable: {len(ins['escalation_pending'])} · not eligible: {esc.get('NOT_ELIGIBLE', 0)} · not applicable: "
+             f"{esc.get('NOT_APPLICABLE', 0)}.", size=8.8)
+    pdf.para("Simulated SLA targets (elapsed clock hours, research-defined): "
+             + " · ".join(f"{p} respond {sla[p]['response_hours']} h / resolve {sla[p]['resolution_hours']} h" for p in ("P1", "P2", "P3", "P4") if p in sla)
+             + ". Nothing is submitted to AMER, the DGA or any government system.", size=8, color=MUTED)
 
-    # ---- 9 Management recommendations ----------------------------------------------
-    pdf.section(9, "Management Recommendations", "Generated by fixed rules from the counts above; each states its basis.")
-    for k, r in enumerate(ins["recommendations"], start=1):
-        pdf.para(f"{k}. {r['title']}", size=10, bold=True, color=GREEN)
-        pdf.para(r["basis"], size=9, color=INK)
-        pdf.ln(1.5)
+    pdf.section(9, "Management Recommendations", "توصيات للإدارة")
+    if ins["recommendations"]:
+        for k, r in enumerate(ins["recommendations"], start=1):
+            pdf.para(f"{k}. {r['title']}", size=9.2, bold=True, color=GREEN, h=4.8)
+            pdf.para(r["basis"], size=8.4, h=4.4)
+    else:
+        pdf.note(f"Not generated: only {cov['reviews']} review(s) were analysed. Management-level recommendations require at least "
+                 f"{ins['min_reviews']} analysed reviews so that they do not generalise from a very small sample.")
 
-    # ---- 10 Methodology and limitations ---------------------------------------------
-    pdf.section(10, "Methodology and Limitations")
-    pdf.para("Method. Each review is processed by three cooperating agents. The Investigation Agent extracts independent issues with "
-             "verbatim evidence and maps each to a service-quality dimension. The Impact Agent judges whether the beneficiary could "
-             "complete the service, applies severity rules R1–R4 and sets priority with a research-defined Impact x Urgency matrix "
-             "informed by ITIL 4 (capped by P-VERIFY when evidence stays insufficient). It can send an "
-             "issue back to the Investigation Agent for revision (at most two rounds). The Resolution Agent decides the action, "
-             "checks complaint history and SLA, routes a simulated ticket to a handling team with simulated SLA targets, and drafts an "
-             "Arabic reply for human review. ITIL 4, ISO/IEC 20000-1 and ISO 10002 inform the design; the project claims no "
-             "compliance with them and has no official approval.", size=9)
-    pdf.ln(1.5)
-    pdf.para(f"Coverage. This report covers the {cov['reviews']:,} reviews analysed in the session on {cov['analysis_date']}, not the "
-             "whole dataset unless all reviews were analysed.", size=9)
-    pdf.ln(1.5)
-    pdf.para("Limitations:", size=9, bold=True)
-    pdf.bullets(["This report counts the framework's decisions; accuracy against human-verified labels is reported separately "
-                 "in the Evaluation page.",
-                 "Severity, priority and escalation rules are proposed by the researcher and are not official DGA rules.",
-                 "Management recommendations are generated by fixed rules from the counts; they are not expert judgements."]
-                + ref["limitations"], size=8.5)
-    pdf.ln(1)
-    c = ref["citation"]
+    pdf.section(10, "Research Limitations", "حدود البحث")
+    pdf.bullets(["Research prototype: the figures count the framework's decisions; accuracy is measured separately against "
+                 "human-verified labels.",
+                 "Severity, priority, SLA, routing and escalation rules are research-defined; ITIL 4, ISO/IEC 20000-1:2018 and "
+                 "ISO 10002:2018 inform the design, with no claim of compliance or official approval.",
+                 "EGSQUAL dimension definitions and the crosswalk are unverified until the full paper is reviewed.",
+                 f"Coverage is limited to the {cov['reviews']:,} analysed review(s); rule-based fallback results are counted "
+                 "separately from LLM results."], size=8.2)
+    c = tools.egsqual_reference()["citation"]
     pdf.para(f"Reference: {c['authors']} ({c['year']}). {c['title']}. {c['journal']}, {c['volume']}, {c['article']}. "
-             f"https://doi.org/{c['doi']}", size=8, color=MUTED)
+             f"https://doi.org/{c['doi']}", size=7.2, color=MUTED, h=3.8)
     return bytes(pdf.output())

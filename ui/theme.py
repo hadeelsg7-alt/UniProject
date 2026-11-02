@@ -163,6 +163,13 @@ section[data-testid="stSidebar"] a[data-testid="stSidebarNavLink"][aria-current=
 [class*="st-key-frame_Overall"] {{ border: 3px solid #0E3B2C !important; border-radius: 18px !important;
                                  background: #F7FAF8 !important; padding: 14px 16px 6px 16px !important; }}
 [class*="st-key-frame_Agent"] .kpi {{ border-top-color: var(--agent) !important; border-color: var(--agent); }}
+/* Arabic title and compact page header */
+.hero .hero-ar {{ font-family: 'IBM Plex Sans Arabic', 'Geeza Pro', Tahoma, sans-serif; font-size: 1.35rem; font-weight: 700;
+                 color: #D6ECDF; text-align: right; margin: -4px 0 6px 0; }}
+.page-head {{ border-left: 6px solid var(--navy); background: #fff; border-radius: 12px; padding: 12px 16px; margin: 0 0 14px 0;
+              border-top: 1px solid var(--border); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }}
+.page-head .ph-title {{ font-size: 1.45rem; font-weight: 700; color: var(--navy); }}
+.page-head .ph-line {{ color: var(--ink2); font-size: 0.95rem; margin-top: 2px; }}
 /* Insights tables with right-to-left Arabic evidence */
 .ins-table {{ overflow-x: auto; margin: 4px 0 14px 0; }}
 .ins-table table {{ width: 100%; border-collapse: collapse; font-size: 0.86rem; background: #fff; border: 1px solid var(--border); border-radius: 10px; }}

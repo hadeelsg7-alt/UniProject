@@ -319,7 +319,8 @@ def urgency_level(service_completion: str, scope: str, risk_flags: list[str]) ->
 
 def impact_urgency_matrix(service_completion: str, scope: str, risk_flags: list[str], matrix: dict | None = None,
                           evidence_insufficient: bool = False) -> dict:
-    """Priority from the research-defined Impact x Urgency matrix (ITIL 4-informed), plus the P-VERIFY cap."""
+    """Priority from the research-defined Impact x Urgency matrix (ITIL 4-informed). Insufficient evidence never
+    lowers the priority: it only adds the P-VERIFY flag (provisional, human verification required)."""
     kb = priority_matrix_kb()
     m = matrix or kb["matrix"]
     imp, ir = impact_level(service_completion, scope, risk_flags)
@@ -327,10 +328,7 @@ def impact_urgency_matrix(service_completion: str, scope: str, risk_flags: list[
     pr = m[imp][urg]
     rules = [ir, ur, f"MATRIX[{imp},{urg}]"]
     if evidence_insufficient:
-        cap = kb["verification_cap"]["cap"]
-        if _PRIORITY_LEVELS.index(pr) < _PRIORITY_LEVELS.index(cap):
-            pr = cap
-            rules.append("P-VERIFY")
+        rules.append("P-VERIFY")
     return {"priority": pr, "impact": imp, "urgency": urg, "rules": rules,
             "explanation": f"Impact {imp} ({ir}) x Urgency {urg} ({ur}) -> {m[imp][urg]}"}
 

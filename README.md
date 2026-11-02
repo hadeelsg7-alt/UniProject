@@ -1,4 +1,4 @@
-# GovFeedback AI — Multi-Agent Intelligence for Digital Service Quality
+# BeneficiaryVoice AI — Multi-Agent Feedback Intelligence · صوت المستفيد الذكي
 
 **Project title:** *A Multi-Agent AI Framework for Arabic Beneficiary Feedback Analysis to Enhance Digital Service
 Quality and Beneficiary Experience in Saudi Government Digital Services.*
@@ -321,15 +321,15 @@ Launch with `streamlit run app.py` and open <http://localhost:8501>.
 
 | Page | What to show |
 |---|---|
-| **Executive Dashboard** | Homepage for management. It shows full-dataset statistics (clearly separated) and, only after analysis, insights from analysed reviews: categories, priorities, top issues, affected dimensions, P1/P2 issues, actionable feedback and improvement opportunities. |
-| **Agent 1 — Feedback Analysis** | Arabic review input (typed, example, test scenario S1–S8 or dataset pick). Running it starts the full three-agent workflow. Shows issues, feedback type, service-quality (EGSQUAL) dimension with its reason, verbatim evidence and ambiguity. |
-| **Agent 2 — Impact & Prioritization** | The same review: Agent 1's hand-over, severity (R1–R4), the Impact × Urgency matrix cell behind each P1–P4, and the Agent 2 → Agent 1 re-evaluation requests. |
-| **Agent 3 — Resolution & Escalation** | Actionability, handling team, simulated ticket with research-defined SLA targets, escalation rules E1–E5 and an Arabic reply draft, all for human review. |
-| **Results & Evaluation** | Run a sample; per-agent results; the collaboration trace; ground-truth evaluation (P/R/Macro F1, confusion matrices, Multi-Agent vs Single LLM vs Sequential); CSV/JSON export. |
-| **Service Quality Insights** | Management view: issues, dimensions, trends across applications, severity/priority, recurring issues and improvements; **Generate Executive Report** (PDF). |
-| **Methodology & Rules** | Published frameworks (ITIL 4, ISO/IEC 20000-1, ISO 10002, EGSQUAL) versus research-defined rules, the matrix, simulated SLA targets, routing, escalation rules and human-in-the-loop requirements. |
+| **Data & Run Analysis** (start) | Use the existing dataset or upload a CSV; choose how many reviews (random sample with a seed, or the first N); **Run Multi-Agent Analysis**. Execution status separates LLM analysis, rule-based fallback and failed analyses. A single typed review, example or test scenario (S1–S8) can also be analysed here. |
+| **Agent 1 — Feedback Analysis** | Issues, feedback type, EGSQUAL dimension (with reason) and ambiguity for all analysed reviews; Review ID selector; Arabic evidence right-to-left; *View Details*. |
+| **Agent 2 — Impact & Prioritization** | Impact, urgency, severity, priority (Impact × Urgency matrix) and evidence confidence per issue; missing information never lowers a priority (marked provisional instead); *View Details* with the matrix, rules and the Agent 1 ↔ Agent 2 critique trace. |
+| **Agent 3 — Resolution & Escalation** | Action, handling team, ticket status, priority, simulated SLA target and escalation recommendation; Arabic reply draft for human review; *View Details* with the ticket and rules E1–E5. |
+| **Executive Dashboard** | Full-dataset statistics vs analysed results, coverage, top issues, affected dimensions, priority distribution, actionable feedback and improvement opportunities; management recommendations only from 30+ analysed reviews; **Generate Executive Report** (2–4 page bilingual PDF). |
+| **Evaluation & Results** | Session collaboration summary, label-free consistency checks and CSV/JSON export; ground-truth evaluation per agent (classification, EGSQUAL, issue count, severity, priority, actionability, routing, escalation) and the baseline comparison. |
+| *Reference & settings* | **Methodology & References** (frameworks vs research-defined rules, EGSQUAL status) and **Settings** (engine, LLM connection test, critique rounds, simulated SLA targets, matrix, Management Presentation Mode). |
 
-**Settings** (bottom of the sidebar) hold the reasoning engine, review rounds, SLA reference date, dataset upload, simulated SLA targets and the Impact × Urgency matrix cells.
+Default simulated SLA targets (research-defined, elapsed clock hours): P1 1 h / 4 h, P2 4 h / 24 h, P3 8 h / 72 h, P4 24 h / 168 h.
 
 The live view is driven by the workflow's own callbacks and trace, so it shows only what existed at each point. Revision arrows and
 counters appear only when a review request really occurred.

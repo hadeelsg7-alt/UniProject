@@ -231,6 +231,7 @@ class IssueAssessment(BaseModel):
     priority: Priority
     impact: str = ""   # High / Medium / Low (Impact x Urgency matrix)
     urgency: str = ""  # High / Medium / Low
+    evidence_confidence: str = "High"  # High / Medium / Low - kept separate from severity and priority
     rules_applied: list[str] = Field(default_factory=list)
     reasoning: str
     evidence: list[str] = Field(default_factory=list)

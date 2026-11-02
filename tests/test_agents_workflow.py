@@ -47,7 +47,8 @@ def test_revision_loop_confirm_then_insufficient_evidence(offline_workflow):
     assert any(m.content.startswith("CONFIRM") for m in st.messages if m.message_type == "REVIEW_RESPONSE")
     a = st.agent2.assessments[0]
     assert a.verification_status == VerificationStatus.INSUFFICIENT_EVIDENCE and a.provisional
-    assert a.priority.value == "P3"  # capped by P-VERIFY
+    # missing information never downgrades the priority: it stays as the matrix set it, flagged provisional
+    assert a.priority.value == "P2" and "P-VERIFY" in a.rules_applied and a.evidence_confidence == "Low"
     assert st.agent3.action == ActionType.REQUEST_ADDITIONAL_INFO
 
 

@@ -137,5 +137,54 @@ def test_revision_loop_reaches_two_rounds_then_stops():
                              "A1_REVIEW_RESPONSE", "A2_ASSESS", "A3_RESOLVE", "END"]
     assert any(e.action == "LIMIT_REACHED" for e in st.decision_log)
     a = st.agent2.assessments[0]
-    assert a.verification_status.value == "INSUFFICIENT_EVIDENCE" and a.priority.value == "P3"
+    assert a.verification_status.value == "INSUFFICIENT_EVIDENCE" and a.provisional and a.evidence_confidence == "Low"
+    assert a.priority.value == "P1"  # BLOCKED + FINANCIAL stays P1: not downgraded for insufficient evidence
     assert st.agent3 is not None
+
+
+# --------------------------------------------------------------------------- #
+# Billing / credit error (HTTP 400): explained, never reported as LLM, and no repeated failing calls
+# --------------------------------------------------------------------------- #
+class _BillingHandler(BaseHTTPRequestHandler):
+    calls = 0
+
+    def do_POST(self):  # noqa: N802
+        _BillingHandler.calls += 1
+        self.rfile.read(int(self.headers["Content-Length"]))
+        data = json.dumps({"type": "error", "error": {"type": "invalid_request_error",
+                           "message": "Your credit balance is too low to access the Anthropic API."}}).encode()
+        self.send_response(400)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def log_message(self, *a):
+        pass
+
+
+def test_billing_error_falls_back_once_and_is_explained(monkeypatch):
+    from llm import health_check
+    from workflow import execution_status
+
+    srv = HTTPServer(("127.0.0.1", 0), _BillingHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", f"http://127.0.0.1:{srv.server_port}")
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "test-key-not-real")
+    monkeypatch.setattr(config, "LLM_RETRY_BASE_DELAY", 0.0)
+    try:
+        client = LLMClient(provider="anthropic")
+        wf = MultiAgentWorkflow(client)
+        s1 = wf.run(REVIEW)
+        calls_after_first = _BillingHandler.calls
+        s2 = wf.run(REVIEW.model_copy(update={"review_id": "L2"}))
+        assert execution_status(s1) == execution_status(s2) == "Rule-based fallback"
+        assert "credit" in client.fatal_error and "test-key-not-real" not in client.fatal_error  # no secret leaks
+        assert _BillingHandler.calls == calls_after_first  # second review made no request
+        assert s1.agent3 is not None and s2.agent3 is not None  # the workflow still completes
+        hc = health_check(client)
+        assert hc["ok"] is False and "credit" in hc["message"]
+    finally:
+        srv.shutdown()

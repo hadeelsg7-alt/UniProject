@@ -17,6 +17,15 @@ except ImportError:  # pragma: no cover
     pass
 
 BASE_DIR = Path(__file__).resolve().parent
+
+# Branding
+APP_NAME = "BeneficiaryVoice AI"
+APP_TITLE_EN = "BeneficiaryVoice AI — Multi-Agent Feedback Intelligence"
+APP_TITLE_AR = "صوت المستفيد الذكي — نظام متعدد الوكلاء لتحليل ملاحظات المستفيدين"
+APP_SHORT = "BeneficiaryVoice AI | صوت المستفيد الذكي"
+PROTOTYPE_LABEL = "Research Prototype — Proposed Decision-Support Solution"
+# Management-level recommendations are only generated from at least this many analysed reviews
+MIN_REVIEWS_FOR_RECOMMENDATIONS = 30
 KB_DIR = BASE_DIR / "knowledge_base"
 DATA_DIR = BASE_DIR / "data"
 OUTPUT_DIR = BASE_DIR / "outputs"

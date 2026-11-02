@@ -1,9 +1,21 @@
 {
-  "_about": "RESEARCH-DEFINED SIMULATED SLA targets per priority, used only to show how simulated tickets would be tracked. They are NOT official service levels of the DGA, AMER / Balaagh Digital or any government entity. Editable here or in the app's Settings.",
+  "_about": "RESEARCH-DEFINED SIMULATED SLA targets per priority, in elapsed clock hours, used only to show how simulated tickets would be tracked. They are NOT official service levels of the DGA, AMER / Balaagh Digital or any government entity, and they are NOT prescribed by ITIL 4, ISO/IEC 20000-1 or ISO 10002. Editable here or in the app's Settings.",
   "targets": {
-    "P1": {"response_hours": 4, "resolution_hours": 24},
-    "P2": {"response_hours": 8, "resolution_hours": 72},
-    "P3": {"response_hours": 24, "resolution_hours": 120},
-    "P4": {"response_hours": 72, "resolution_hours": 240}
+    "P1": {
+      "response_hours": 1,
+      "resolution_hours": 4
+    },
+    "P2": {
+      "response_hours": 4,
+      "resolution_hours": 24
+    },
+    "P3": {
+      "response_hours": 8,
+      "resolution_hours": 72
+    },
+    "P4": {
+      "response_hours": 24,
+      "resolution_hours": 168
+    }
   }
 }

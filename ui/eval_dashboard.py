@@ -34,11 +34,10 @@ def _ctx():
 def page_eval_dashboard(show_hero: bool = True) -> None:
     c = _ctx()
     if show_hero:
-        C.hero("Evaluation", "Per-agent Precision / Recall / F1 against validated reference labels, ticket JSON validity, "
-               "and Multi-Agent vs Single LLM vs Sequential LLM pipeline on the same test set.",
-               ["Human-verified labels only", "No fabricated scores", "Cost = estimate"])
-    C.mode_banner(c.llm)
-
+        C.page_header("📈 Evaluation & Results", "How well the three agents perform: session results and collaboration, then "
+                      "accuracy against human-verified labels and the baseline comparison. No score is ever estimated.")
+    _session_results(c)
+    C.section("Ground-truth evaluation", "metrics appear only after human-verified labels are uploaded")
     labels, ref = _step_labels(c)
     if labels is None:
         return
@@ -46,6 +45,34 @@ def page_eval_dashboard(show_hero: bool = True) -> None:
     if run is None:
         return
     _results(run, labels)
+
+
+def _session_results(c) -> None:
+    """Label-free view of the session's analysis results: collaboration, decision consistency, exports."""
+    from ui.pages import analysed
+    from workflow import state_to_dict, state_to_row
+
+    states = analysed()
+    C.section("Session results and agent collaboration", "reviews analysed on the Data & Run Analysis page · no labels needed")
+    if not states:
+        C.empty_state("📋", "No analysed reviews in this session", "Run the analysis on the Data & Run Analysis page.")
+        return
+    preds = [E.predictions_from_state(s) for s in states]
+    col = E.collaboration_summary(preds)
+    C.kpi_row([("Reviews analysed", col["reviews"], "three-agent workflow"),
+               ("Reviews with a critique", col["with_review_request"], f"{col['review_requests']} request(s) Agent 2 → Agent 1"),
+               ("Revision rounds", col["revision_rounds"], f"max {col['max_rounds_used']} per review (limit 2)"),
+               ("Rule-based fallback", col["llm_fallback_reviews"], "reviews with an LLM failure", "warn" if col["llm_fallback_reviews"] else "")])
+    with st.expander("Evidence and decision consistency (label-free checks)"):
+        st.dataframe(E.consistency_rates(preds), hide_index=True, width="stretch")
+        st.caption("These checks test the agents against their own documented rules and the review text; they are not accuracy.")
+    table = pd.DataFrame([state_to_row(s) for s in states])
+    a, b = st.columns(2)
+    a.download_button("⬇️ Results (CSV)", table.to_csv(index=False).encode("utf-8-sig"), "analysis_results.csv", "text/csv",
+                      width="stretch")
+    b.download_button("⬇️ Full results with collaboration traces (JSON)",
+                      json.dumps([state_to_dict(s) for s in states], ensure_ascii=False, indent=1).encode("utf-8"),
+                      "analysis_results.json", "application/json", width="stretch")
 
 
 # --------------------------------------------------------------------------- #
@@ -70,7 +97,7 @@ def _step_labels(c):
                                    "annotation_guidelines.md", "text/markdown", width="stretch")
         with b, st.container(border=True):
             st.markdown("**Label columns** (any subset; empty cell = not labelled)")
-            st.dataframe(pd.DataFrame([{"column": k, "agent": C.agent_name(v["agent"]), "values": ", ".join(v["values"] or ["EGSQUAL keys ';'"])}
+            st.dataframe(pd.DataFrame([{"column": k, "agent": C.agent_name(v["agent"]), "values": ", ".join(v["values"] or (E.team_names() if k == "handling_team" else ["EGSQUAL keys ';'"]))}
                                        for k, v in E.LABEL_SPEC.items()]), hide_index=True, width="stretch", height=320)
 
     up = st.file_uploader("Upload the labels: CSV, or the Excel review workbook (must contain `review_id`; optional `text`, `rating`, `app_id`)",
@@ -223,8 +250,8 @@ def _multiclass_block(title: str, m: dict, color: str, order: list[str] | None, 
 def _agent1(preds, labels) -> None:
     m = E.agent1_metrics(labels, preds)
     with st.container(key="frame_Agent1_evd"):
-        C.agent_section_header("Agent1", "categorisation & service domain vs. validated reference labels · P, R, Macro F1")
-        _multiclass_block("Feedback type", m["feedback_type"], A_COLORS["Agent1"], E.FEEDBACK_TYPES, "evd_ft")
+        C.agent_section_header("Agent1", "Agent 1 evaluation: feedback classification, EGSQUAL dimensions, issue extraction")
+        _multiclass_block("Feedback classification", m["feedback_type"], A_COLORS["Agent1"], E.FEEDBACK_TYPES, "evd_ft")
         d = m["dimensions"]
         with st.container(border=True):
             st.markdown(f"**Service domain (EGSQUAL dimensions, multi-label)** · {d['n']} labelled review(s)")
@@ -237,12 +264,20 @@ def _agent1(preds, labels) -> None:
                 if not d["table"].empty:
                     st.altair_chart(CH.prf_bars(d["table"]), width="stretch", key="evd_dim_prf")
                     st.dataframe(d["table"], hide_index=True, width="stretch")
+        ic = m["issue_count"]
+        with st.container(border=True):
+            st.markdown(f"**Issue extraction** (number of independent issues per review) · {ic['n']} labelled review(s)")
+            if not ic["n"]:
+                st.caption("Add an `issue_count` column to the labels to evaluate issue extraction.")
+            else:
+                C.kpi_row([("Exact issue-count accuracy", _f(ic["accuracy"]), "reviews with the right number of issues"),
+                           ("Macro F1", _f(ic["macro_f1"]), "over issue-count classes")])
 
 
 def _agent2(preds, labels) -> None:
     m = E.agent2_metrics(labels, preds, st.session_state.get("evd_reviews"))
     with st.container(key="frame_Agent2_evd"):
-        C.agent_section_header("Agent2", "sentiment, severity and priority vs. validated reference labels · P, R, Macro F1")
+        C.agent_section_header("Agent2", "Agent 2 evaluation: severity and priority accuracy, confusion matrices, consistency")
         _multiclass_block("Sentiment", m["sentiment"], A_COLORS["Agent2"], E.SENTIMENTS, "evd_sent")
         with st.container(border=True):
             st.markdown("**Star rating as a supporting indicator for sentiment** (1–2★ negative · 3★ neutral · 4–5★ positive)")
@@ -255,6 +290,10 @@ def _agent2(preds, labels) -> None:
             st.caption("The rating is never used as a label and never changes severity; it only helps interpret sentiment.")
         _multiclass_block("Severity", m["severity"], A_COLORS["Agent2"], E.SEVERITIES, "evd_sev")
         _multiclass_block("Priority", m["priority"], A_COLORS["Agent2"], E.PRIORITIES, "evd_pri")
+        if any(p.consistency for p in preds):
+            with st.container(border=True):
+                st.markdown("**Evidence and decision consistency** (label-free, on the evaluated reviews)")
+                st.dataframe(E.consistency_rates(preds), hide_index=True, width="stretch")
 
 
 def _binary_kpis(title: str, b: dict) -> None:
@@ -272,10 +311,10 @@ def _binary_kpis(title: str, b: dict) -> None:
 def _agent3(preds, labels) -> None:
     m = E.agent3_metrics(labels, preds)
     with st.container(key="frame_Agent3_evd"):
-        C.agent_section_header("Agent3", "ticket & escalation decisions vs. reference decisions · P, R, F1, JSON validity")
+        C.agent_section_header("Agent3", "Agent 3 evaluation: actionability, routing and escalation decisions, JSON validity")
         a, b = st.columns(2)
         with a:
-            _binary_kpis("Ticket generation decision", m["ticket"])
+            _binary_kpis("Actionability (ticket generated: yes/no)", m["ticket"])
         with b:
             _binary_kpis("Escalation decision (simulated)", m["escalation"])
         with st.container(border=True):
@@ -285,6 +324,11 @@ def _agent3(preds, labels) -> None:
             bad = m["json_checks"][~m["json_checks"]["valid"]] if m["json_total"] else pd.DataFrame()
             if not bad.empty:
                 st.dataframe(bad, hide_index=True, width="stretch")
+        rt = m["routing"]
+        if rt["n"]:
+            _multiclass_block("Routing (handling team)", rt, A_COLORS["Agent3"], None, "evd_route")
+        else:
+            st.caption("Routing accuracy: add a `handling_team` column to the labels (team names as in knowledge_base/handling_teams.json).")
         _multiclass_block("Recommended action (additional)", m["action"], A_COLORS["Agent3"], E.ACTIONS, "evd_act")
 
 

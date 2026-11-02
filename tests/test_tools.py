@@ -55,7 +55,7 @@ def test_impact_urgency_matrix():
     assert m("DEGRADED", "INDIVIDUAL", [])["priority"] == "P4"                    # Low x Low
     assert m("NOT_AFFECTED", "INDIVIDUAL", [])["priority"] == "P4"
     r = m("BLOCKED", "INDIVIDUAL", [], evidence_insufficient=True)
-    assert r["priority"] == "P3" and "P-VERIFY" in r["rules"]
+    assert r["priority"] == "P2" and "P-VERIFY" in r["rules"]  # flagged, never downgraded
     custom = {lvl: {u: "P4" for u in ("High", "Medium", "Low")} for lvl in ("High", "Medium", "Low")}
     assert m("BLOCKED", "WIDESPREAD", ["SAFETY"], matrix=custom)["priority"] == "P4"  # cells are configurable
     assert m("BLOCKED", "INDIVIDUAL", [])["explanation"].startswith("Impact High")

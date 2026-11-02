@@ -117,7 +117,7 @@ def knowledge() -> str:
         "Impact factors:\n" + json.dumps(sr["impact_factors"], ensure_ascii=False, indent=1),
         "Severity rules:\n" + json.dumps(sr["severity_rules"], ensure_ascii=False, indent=1),
         "Priority = Impact x Urgency matrix (impact rules, urgency rules, cells):\n"
-        + json.dumps({k: mk[k] for k in ("impact_rules", "urgency_rules", "matrix", "verification_cap")}, ensure_ascii=False, indent=1),
+        + json.dumps({k: mk[k] for k in ("impact_rules", "urgency_rules", "matrix", "verification_rule")}, ensure_ascii=False, indent=1),
         "Escalation rules (all of E1-E4 must hold; minimum severity " + er["min_severity_for_escalation"] + "):\n"
         + json.dumps(er["rules"], ensure_ascii=False, indent=1),
         "Actions:\n" + json.dumps(actions, ensure_ascii=False, indent=1),

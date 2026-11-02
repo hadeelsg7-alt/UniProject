@@ -111,6 +111,18 @@ class MultiAgentWorkflow:
 # --------------------------------------------------------------------------- #
 # Export helpers
 # --------------------------------------------------------------------------- #
+def execution_status(state: WorkflowState) -> str:
+    """How a review was really processed: 'LLM', 'Rule-based fallback' (an LLM step failed), 'Rule-based (offline)'
+    or 'Failed' (the workflow did not complete). Never reports LLM when a fallback was used."""
+    if state.agent3 is None:
+        return "Failed"
+    if any(e.action == "LLM_FALLBACK" for e in state.decision_log):
+        return "Rule-based fallback"
+    if state.reasoner.startswith("offline"):
+        return "Rule-based (offline)"
+    return "LLM"
+
+
 def state_to_dict(state: WorkflowState) -> dict:
     return state.model_dump(mode="json")
 
@@ -136,9 +148,11 @@ def state_to_row(state: WorkflowState) -> dict:
         "review_requests": sum(1 for m in state.messages if m.message_type == "REVIEW_REQUEST"),
         "action": a3.action.value if a3 else None,
         "escalation_status": a3.escalation.status.value if a3 else None,
+        "handling_team": a3.handling_team if a3 else None,
         "ticket_id": a3.ticket.ticket_id if a3 and a3.ticket else None,
         "final_decision": a3.final_decision if a3 else None,
         "tools_used": ";".join(sorted({t.tool for t in state.tool_calls})),
         "reasoner": state.reasoner,
+        "execution_status": execution_status(state),
         "errors": " | ".join(state.errors),
     }

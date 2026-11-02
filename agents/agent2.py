@@ -16,7 +16,6 @@ from schemas import (
     SEVERITY_ORDER, Agent2Output, AgentMessage, IssueAssessment, LLMImpact, LLMImpactAssessment,
     Priority, Severity, VerificationStatus, WorkflowState,
 )
-from tools import priority_matrix_kb
 
 _PRIO = ["P1", "P2", "P3", "P4"]
 
@@ -192,17 +191,17 @@ Return only the requested structured output."""
             res = state.resolved_concerns.get(self._key(c))
             if c in unresolved or (c[0] in weak_codes and res == "CONFIRMED"):
                 insufficient.update(c[1])
-        cap = priority_matrix_kb()["verification_cap"]["cap"]
         for a in assessments:
             if a.issue_id in insufficient:
                 a.verification_status = VerificationStatus.INSUFFICIENT_EVIDENCE
                 a.provisional = True
-                if _PRIO.index(a.priority.value) < _PRIO.index(cap):
-                    a.priority = Priority(cap)
-                    a.rules_applied.append("P-VERIFY")
-                a.reasoning += " | Evidence remained insufficient after the revision loop: severity is provisional, priority capped."
+                a.evidence_confidence = "Low"
+                a.rules_applied.append("P-VERIFY")
+                a.reasoning += (" | Evidence remained insufficient after the revision loop: severity and priority are kept but "
+                                "provisional; a human must verify before acting (never downgraded for missing information).")
             elif a.issue_id in raised_ids or "*" in raised_ids:
                 a.verification_status = VerificationStatus.VERIFIED_AFTER_REVISION
+                a.evidence_confidence = "Medium"
 
     def _output(self, state, assessments, senti, reasoner, provisional: bool) -> Agent2Output:
         overall_sev = max((a.severity for a in assessments), key=lambda s: SEVERITY_ORDER[s.value]) if assessments else None

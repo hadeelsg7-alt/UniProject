@@ -1,19 +1,63 @@
 {
   "_about": "RESEARCH-DEFINED Impact x Urgency priority matrix used by Agent 2. The idea of deriving priority from impact and urgency is informed by ITIL 4 (incident management practice) and by the service-management principles of ISO/IEC 20000-1. The impact and urgency rules, the levels and the cell values below are this project's own design; they are NOT prescribed by ITIL 4, ISO/IEC 20000-1 or any Saudi authority. Edit the matrix cells here (or in the app's Settings) without changing code.",
   "impact_rules": [
-    {"id": "I-HIGH", "level": "High", "rule": "Service completion is BLOCKED, or PARTIALLY_BLOCKED for many users (WIDESPREAD)."},
-    {"id": "I-MED", "level": "Medium", "rule": "Service is PARTIALLY_BLOCKED, or DEGRADED and RECURRING / WIDESPREAD / with a risk flag."},
-    {"id": "I-LOW", "level": "Low", "rule": "Service is DEGRADED for one user without risk, or NOT_AFFECTED."}
+    {
+      "id": "I-HIGH",
+      "level": "High",
+      "rule": "Service completion is BLOCKED, or PARTIALLY_BLOCKED for many users (WIDESPREAD)."
+    },
+    {
+      "id": "I-MED",
+      "level": "Medium",
+      "rule": "Service is PARTIALLY_BLOCKED, or DEGRADED and RECURRING / WIDESPREAD / with a risk flag."
+    },
+    {
+      "id": "I-LOW",
+      "level": "Low",
+      "rule": "Service is DEGRADED for one user without risk, or NOT_AFFECTED."
+    }
   ],
   "urgency_rules": [
-    {"id": "U-HIGH", "level": "High", "rule": "A risk flag is present (FINANCIAL, PERSONAL_DATA_SECURITY, SAFETY, LEGAL_DEADLINE), or the service is BLOCKED for many users (WIDESPREAD)."},
-    {"id": "U-MED", "level": "Medium", "rule": "The beneficiary cannot proceed now (BLOCKED / PARTIALLY_BLOCKED), or the problem is RECURRING or WIDESPREAD."},
-    {"id": "U-LOW", "level": "Low", "rule": "No time pressure is evident in the feedback."}
+    {
+      "id": "U-HIGH",
+      "level": "High",
+      "rule": "A risk flag is present (FINANCIAL, PERSONAL_DATA_SECURITY, SAFETY, LEGAL_DEADLINE), or the service is BLOCKED for many users (WIDESPREAD)."
+    },
+    {
+      "id": "U-MED",
+      "level": "Medium",
+      "rule": "The beneficiary cannot proceed now (BLOCKED / PARTIALLY_BLOCKED), or the problem is RECURRING or WIDESPREAD."
+    },
+    {
+      "id": "U-LOW",
+      "level": "Low",
+      "rule": "No time pressure is evident in the feedback."
+    }
   ],
   "matrix": {
-    "High":   {"High": "P1", "Medium": "P2", "Low": "P3"},
-    "Medium": {"High": "P2", "Medium": "P3", "Low": "P4"},
-    "Low":    {"High": "P3", "Medium": "P4", "Low": "P4"}
+    "High": {
+      "High": "P1",
+      "Medium": "P2",
+      "Low": "P3"
+    },
+    "Medium": {
+      "High": "P2",
+      "Medium": "P3",
+      "Low": "P4"
+    },
+    "Low": {
+      "High": "P3",
+      "Medium": "P4",
+      "Low": "P4"
+    }
   },
-  "verification_cap": {"id": "P-VERIFY", "rule": "If evidence is still insufficient after the Agent 1 <-> Agent 2 review loop, priority is capped at P3 (provisional) until clarified.", "cap": "P3"}
+  "verification_rule": {
+    "id": "P-VERIFY",
+    "rule": "If the evidence is still insufficient after the Agent 1 <-> Agent 2 review loop, severity and priority are KEPT (a potentially critical issue is never downgraded because information is missing), both are marked provisional, evidence confidence is Low and a human must verify the case."
+  },
+  "evidence_confidence": {
+    "High": "Evidence verified in the review on the first pass",
+    "Medium": "Evidence verified after the Agent 1 <-> Agent 2 review loop",
+    "Low": "Evidence still insufficient after the review loop (provisional)"
+  }
 }

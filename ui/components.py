@@ -21,9 +21,16 @@ def md(markup: str) -> None:
 # --------------------------------------------------------------------------- #
 # Page furniture
 # --------------------------------------------------------------------------- #
-def hero(title: str, subtitle: str, tags: Iterable[str] = ()) -> None:
+def hero(title: str, subtitle: str, tags: Iterable[str] = (), title_ar: str = "") -> None:
     tag_html = "".join(f'<span class="tag">{esc(t)}</span>' for t in tags)
-    md(f'<div class="hero"><h1>{esc(title)}</h1><p>{esc(subtitle)}</p><div class="tagrow">{tag_html}</div></div>')
+    ar = f'<div class="hero-ar" dir="rtl">{esc(title_ar)}</div>' if title_ar else ""
+    md(f'<div class="hero"><h1>{esc(title)}</h1>{ar}<p>{esc(subtitle)}</p><div class="tagrow">{tag_html}</div></div>')
+
+
+def page_header(title: str, line: str, color: str = "#0E3B2C") -> None:
+    """Compact page title + one-line description (agent and secondary pages)."""
+    md(f'<div class="page-head" style="border-left-color:{color}"><div class="ph-title">{esc(title)}</div>'
+       f'<div class="ph-line">{esc(line)}</div></div>')
 
 
 def section(title: str, hint: str = "") -> None:

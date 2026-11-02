@@ -38,7 +38,7 @@ from schemas import ActionType, EscalationStatus, ReviewInput, SimulatedTicket, 
 # Label specification
 # --------------------------------------------------------------------------- #
 FEEDBACK_TYPES = ["Bug", "Suggestion", "Inquiry", "Praise", "General Complaint"]
-SENTIMENTS = ["Negative", "Neutral", "Positive"]
+SENTIMENTS = ["Negative", "Neutral", "Positive", "Mixed"]
 SEVERITIES = ["None", "Low", "Medium", "High", "Critical"]
 PRIORITIES = ["None", "P1", "P2", "P3", "P4"]
 YES_NO = ["yes", "no"]
@@ -108,7 +108,8 @@ _SYN = {
                       "inquiry": "Inquiry", "question": "Inquiry", "استفسار": "Inquiry", "praise": "Praise", "مدح": "Praise",
                       "general complaint": "General Complaint", "complaint": "General Complaint", "شكوى": "General Complaint"},
     "sentiment": {"negative": "Negative", "neg": "Negative", "strongly negative": "Negative", "سلبي": "Negative",
-                  "neutral": "Neutral", "mixed": "Neutral", "neutral / mixed": "Neutral", "محايد": "Neutral",
+                  "neutral": "Neutral", "neutral / mixed": "Neutral", "محايد": "Neutral",
+                  "mixed": "Mixed", "مختلط": "Mixed", "مختلطة": "Mixed",
                   "positive": "Positive", "pos": "Positive", "إيجابي": "Positive", "ايجابي": "Positive"},
     "severity": {"none": "None", "no": "None", "n/a": "None", "low": "Low", "medium": "Medium", "high": "High", "critical": "Critical"},
     "priority": {"none": "None", "no": "None", "n/a": "None", "p1": "P1", "1": "P1", "p2": "P2", "2": "P2",
@@ -431,8 +432,10 @@ class Prediction:
 
 
 def sentiment_class(label: str) -> str:
-    """Map Agent 2's sentiment intensity to the 3-class reference scheme."""
+    """Map a sentiment label to Positive / Negative / Neutral / Mixed (older labels such as 'Strongly negative' included)."""
     k = _key(label)
+    if k == "mixed":
+        return "Mixed"
     if "negative" in k:
         return "Negative"
     if "positive" in k:
@@ -457,7 +460,7 @@ def predictions_from_state(state: WorkflowState, system: str = "multi_agent") ->
         return p
     p.feedback_type = a1.feedback_type
     p.dimensions = frozenset(i.dimension for i in a1.issues)
-    p.sentiment = sentiment_class(a2.sentiment_intensity)
+    p.sentiment = sentiment_class(a1.sentiment)
     p.severity = a2.overall_severity.value if a2.overall_severity else "None"
     p.priority = a2.overall_priority.value if a2.overall_priority else "None"
     p.action = ACTION_CODES[a3.action]

@@ -182,7 +182,7 @@ def _single_review_input(c) -> None:
 def page_data_run() -> None:
     c = ctx()
     C.hero(config.APP_TITLE_EN, "Upload or select the beneficiary reviews, then run the three cooperating agents.",
-           [PROTOTYPE], title_ar=config.APP_TITLE_AR)
+           [PROTOTYPE], title_ar=config.APP_TITLE_AR, logo=True)
 
     C.section("1 · Dataset", "the only place where data is loaded")
     a, b = st.columns([1, 2])
@@ -259,7 +259,7 @@ def page_executive() -> None:
 
     c = ctx()
     C.hero(config.APP_TITLE_EN, "Executive view of beneficiary feedback and where to act first.", [PROTOTYPE],
-           title_ar=config.APP_TITLE_AR)
+           title_ar=config.APP_TITLE_AR, logo=True)
     states = analysed()
     total = c.info["rows_available"] if c.info else None
     ins = INS.compute_insights(states, dataset_reviews=total)

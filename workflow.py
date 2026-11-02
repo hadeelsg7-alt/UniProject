@@ -142,7 +142,7 @@ def state_to_row(state: WorkflowState) -> dict:
         "evidence": " || ".join(i.evidence for i in a1.issues) if a1 else None,
         "overall_severity": a2.overall_severity.value if a2 and a2.overall_severity else None,
         "overall_priority": a2.overall_priority.value if a2 and a2.overall_priority else None,
-        "sentiment": a2.sentiment_intensity if a2 else None,
+        "sentiment": a1.sentiment if a1 else None,
         "verification_status": a2.verification_status.value if a2 else None,
         "revision_rounds": state.revision_count,
         "review_requests": sum(1 for m in state.messages if m.message_type == "REVIEW_REQUEST"),

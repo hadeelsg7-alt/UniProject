@@ -273,6 +273,33 @@ def sentiment_intensity(review_text: str, rating: Optional[int]) -> dict:
     return {"label": label, "score": round(score, 2), "negative_cues": neg, "positive_cues": pos, "rating": rating}
 
 
+_NEG_SENTIMENT = (lx.NEGATIVE + lx.HARD_FAILURE + lx.ERROR_CUES + lx.FRICTION + lx.CRASH_CUES
+                  + [c for t in lx.TOPICS.values() if t.inherent_problem for c in t.cues])  # e.g. "يعلق" (freezes)
+
+
+def sentiment_analyzer(review_text: str, rating: Optional[int] = None) -> dict:
+    """Agent 1, step 1: sentiment of the Arabic text as Positive / Negative / Neutral / Mixed.
+
+    Positive cues = praise words; negative cues = complaint, failure, error, friction and crash words. A praise word
+    preceded by a negation ("مو ممتاز", "غير جيد") counts as negative. Both kinds present -> Mixed. The star rating is
+    reported as a supporting indicator only; it never changes the label."""
+    nc = normalize_with_map(review_text)
+    pos_hits, neg_hits = [], []
+    for h in find_cues(review_text, lx.PRAISE, nc):
+        before = review_text[max(0, h.start - 6):h.start].split()
+        if before and normalize(before[-1]) in lx.NEGATION:
+            neg_hits.append(f"{before[-1]} {review_text[h.start:h.end]}")
+        else:
+            pos_hits.append(review_text[h.start:h.end])
+    neg_hits += [review_text[h.start:h.end] for h in find_cues(review_text, _NEG_SENTIMENT, nc)]
+    pos, neg = len(pos_hits), len(neg_hits)
+    label = "Mixed" if pos and neg else "Positive" if pos else "Negative" if neg else "Neutral"
+    score = round((pos - neg) / (pos + neg), 2) if pos + neg else 0.0
+    rating_view = None if rating is None else ("Negative" if rating <= 2 else "Neutral" if rating == 3 else "Positive")
+    return {"label": label, "score": score, "positive_cues": list(dict.fromkeys(pos_hits)),
+            "negative_cues": list(dict.fromkeys(neg_hits)), "rating": rating, "rating_indicator": rating_view}
+
+
 def severity_rule_engine(service_completion: str, scope: str, risk_flags: list[str]) -> dict:
     """Apply the PROPOSED severity rules R1-R4 (see knowledge_base/severity_priority_rules.json)."""
     serious_risk = {"FINANCIAL", "PERSONAL_DATA_SECURITY", "SAFETY"} & set(risk_flags)
@@ -512,6 +539,7 @@ TOOL_REGISTRY: dict[str, ToolSpec] = {
         ToolSpec("impact_cue_detector", impact_cue_detector, ("Agent2",), "Detect operational impact cues"),
         ToolSpec("sentiment_intensity", sentiment_intensity, ("Agent2",), "Sentiment intensity (not severity)"),
         ToolSpec("severity_rule_engine", severity_rule_engine, ("Agent2",), "Apply proposed severity rules"),
+        ToolSpec("sentiment_analyzer", sentiment_analyzer, ("Agent1",), "Sentiment of the text: Positive/Negative/Neutral/Mixed"),
         ToolSpec("impact_urgency_matrix", impact_urgency_matrix, ("Agent2",), "Priority from the Impact x Urgency matrix"),
         ToolSpec("handling_team", handling_team, ("Agent3",), "Route the simulated ticket to a handling team"),
         ToolSpec("sla_target", sla_target, ("Agent3",), "Look up simulated SLA targets for a priority"),

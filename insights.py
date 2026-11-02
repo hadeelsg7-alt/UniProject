@@ -21,7 +21,7 @@ from workflow import execution_status
 
 PRIORITIES = ["P1", "P2", "P3", "P4"]
 SEVERITIES = ["Critical", "High", "Medium", "Low"]
-SENTIMENTS = ["Negative", "Neutral", "Positive"]
+SENTIMENTS = ["Negative", "Neutral", "Positive", "Mixed"]
 FEEDBACK_TYPES = ["Bug", "General Complaint", "Suggestion", "Inquiry", "Praise"]
 URGENT = {"P1", "P2"}
 PROTOTYPE_LABEL = config.PROTOTYPE_LABEL
@@ -67,7 +67,7 @@ def compute_insights(states: list[WorkflowState], analysis_date: Optional[date] 
 
     apps = Counter(s.review.app_name or s.review.app_id for s in done)
     types = Counter(s.agent1.feedback_type for s in done)
-    senti = Counter(sentiment_class(s.agent2.sentiment_intensity) for s in done)
+    senti = Counter(sentiment_class(s.agent1.sentiment) for s in done)  # Agent 1, step 1
     sev = Counter(r["severity"] for r in rows)
     prio = Counter(r["priority"] for r in rows)
     actions = Counter(s.agent3.action.value for s in done)

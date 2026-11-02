@@ -22,7 +22,10 @@ from ui.eval_dashboard import page_eval_dashboard
 from ui.theme import inject_css
 from workflow import MultiAgentWorkflow
 
-st.set_page_config(page_title=config.APP_NAME, page_icon="🏛️", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title=config.APP_NAME, page_icon=str(config.LOGO_PATH) if config.LOGO_PATH.exists() else "🏛️",
+                   layout="wide", initial_sidebar_state="auto")
+if config.LOGO_PATH.exists():
+    st.logo(str(config.LOGO_PATH), size="large")
 inject_css()
 
 
@@ -84,7 +87,7 @@ nav = st.navigation({"": [pages[k] for k in ("data", "agent1", "agent2", "agent3
 
 with st.sidebar:
     name_en, name_ar = config.APP_SHORT.split(" | ")
-    st.markdown(f'<div style="font-weight:700;font-size:1.05rem">🏛️ {name_en}</div>'
+    st.markdown(f'<div style="font-weight:700;font-size:1.05rem">{name_en}</div>'
                 f'<div dir="rtl" style="text-align:right;font-weight:700">{name_ar}</div>', unsafe_allow_html=True)
     st.caption(config.PROTOTYPE_LABEL)
     if ss.get("llm_fatal"):

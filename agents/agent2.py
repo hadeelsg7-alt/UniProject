@@ -44,8 +44,10 @@ Return only the requested structured output."""
         """Assess impact; return review requests for Agent 1 (empty list = done)."""
         r, a1 = state.review, state.agent1
         state.log(self.name, "START", f"Assessing {len(a1.issues)} issue(s) from Agent1 (round {state.revision_count})")
-        senti = self.call_tool(state, "sentiment_intensity", "Measure sentiment separately from severity",
-                               review_text=r.text, rating=r.rating)
+        # Sentiment comes from Agent 1 (step 1). It is reported next to severity but never used to set it (rule S0).
+        senti = {"label": a1.sentiment, "score": a1.sentiment_score}
+        state.log(self.name, "INPUT", f"From Agent 1: sentiment {a1.sentiment}, type {a1.feedback_type}, {len(a1.issues)} issue(s), "
+                  f"ambiguous={a1.is_ambiguous} — sentiment is context only, never severity")
 
         if not a1.issues:
             note = (f"Sentiment is '{senti['label']}' (rating {r.rating}) but no operational issue was identified, "
@@ -215,7 +217,7 @@ Return only the requested structured output."""
             vs = VerificationStatus.VERIFIED
         note = ""
         if overall_sev is not None:
-            neg = senti["score"] <= -0.2
+            neg = senti["label"] == "Negative"
             if neg and SEVERITY_ORDER[overall_sev.value] <= 2:
                 note = (f"Sentiment is '{senti['label']}' (rating {state.review.rating}) but operational severity is only "
                         f"{overall_sev.value}: strong negative tone does not by itself make an issue severe (rule S0).")

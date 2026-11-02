@@ -26,7 +26,9 @@ class FeedbackInvestigationAgent(BaseAgent):
     instructions = """You are Agent 1, the Feedback Investigation Agent in a multi-agent framework that analyses
 Arabic beneficiary reviews of Saudi government mobile apps (MSA and Saudi dialect).
 
-Your job:
+Your job, in this order:
+0. Sentiment of the whole comment: Positive, Negative, Neutral or Mixed (Mixed = clearly positive AND clearly negative
+   statements, e.g. praise followed by a complaint), with the exact spans that carry it. Sentiment never decides severity.
 1. Read the ORIGINAL Arabic review carefully, including Saudi dialect (e.g. يعلق = freezes, ما يشتغل = does not work).
 2. Choose the primary feedback type: Bug, Suggestion, Inquiry, Praise, or General Complaint (and secondary types).
 3. Extract every INDEPENDENT issue separately (one problem per issue). Do not merge different problems,
@@ -45,6 +47,8 @@ Return only the requested structured output."""
         r = state.review
         state.log(self.name, "START", f"Investigating review {r.review_id} (app={r.app_id}, rating={r.rating})")
         self.call_tool(state, "arabic_normalizer", "Normalise Arabic orthography before analysis", text=r.text)
+        lex = self.call_tool(state, "sentiment_analyzer", "Step 1: sentiment of the comment (Positive / Negative / Neutral / Mixed)",
+                             review_text=r.text, rating=r.rating)
         dialect = self.call_tool(state, "dialect_lexicon_lookup", "Detect Saudi-dialect expressions", text=r.text)["dialect_terms"]
 
         prompt_parts = [f"Review (app={r.app_id}, rating={r.rating}):\n<<<\n{r.text}\n>>>"]
@@ -58,18 +62,38 @@ Return only the requested structured output."""
 
         raw, reasoner = self.reason(state, "issue extraction", "\n\n".join(prompt_parts), LLMAgent1Analysis,
                                     lambda: heuristics.offline_agent1_analysis(r))
-        out = self._verify_and_decide(state, raw, reasoner, dialect, revision_round=0)
+        out = self._verify_and_decide(state, raw, reasoner, dialect, revision_round=0, lex=lex)
         state.agent1 = out
         state.agent1_history.append(out.model_copy(deep=True))
         state.messages.append(AgentMessage(
             sender=self.name, receiver="Agent2", message_type="HANDOFF",
-            content=f"Analysis {out.status.value}: type={out.feedback_type}, {len(out.issues)} issue(s)",
+            content=(f"Analysis {out.status.value}: sentiment={out.sentiment}, type={out.feedback_type}, {len(out.issues)} issue(s), "
+                     f"dimensions={sorted({i.dimension for i in out.issues})}, ambiguous={out.is_ambiguous}. "
+                     "Evidence attached to each issue; sentiment is for context only (it must not set severity)."),
             issue_ids=[i.issue_id for i in out.issues]))
         return out
 
     # ------------------------------------------------------------------ #
+    def _sentiment(self, state, raw: LLMAgent1Analysis, lex: dict | None, previous: Agent1Output | None) -> dict:
+        """Step 1 result: the LLM's sentiment (evidence verified against the text) when given, else the lexicon tool's."""
+        if raw.sentiment:
+            ev = [q for q in raw.sentiment_evidence
+                  if self.call_tool(state, "evidence_verifier", "Verify a sentiment span", review_text=state.review.text,
+                                    evidence=q)["verified"]]
+            if not ev and lex:
+                ev = lex["positive_cues"] + lex["negative_cues"]
+            score = lex["score"] if lex else (previous.sentiment_score if previous else 0.0)
+            return {"sentiment": raw.sentiment, "sentiment_score": score, "sentiment_evidence": ev, "sentiment_source": "LLM"}
+        if lex:
+            return {"sentiment": lex["label"], "sentiment_score": lex["score"],
+                    "sentiment_evidence": lex["positive_cues"] + lex["negative_cues"], "sentiment_source": "lexicon"}
+        if previous:
+            return {k: getattr(previous, k) for k in ("sentiment", "sentiment_score", "sentiment_evidence", "sentiment_source")}
+        return {}
+
     def _verify_and_decide(self, state: WorkflowState, raw: LLMAgent1Analysis, reasoner: str,
-                           dialect: dict, revision_round: int, previous: Agent1Output | None = None) -> Agent1Output:
+                           dialect: dict, revision_round: int, previous: Agent1Output | None = None,
+                           lex: dict | None = None) -> Agent1Output:
         r = state.review
         self_revisions: list[str] = []
         issues: list[Issue] = []
@@ -124,7 +148,12 @@ Return only the requested structured output."""
             why = "All issues are supported by verified evidence and mapped to valid EGSQUAL dimensions"
         state.log(self.name, "DECISION", f"Status {status.value}. {why}")
 
+        senti = self._sentiment(state, raw, lex, previous)
+        if senti:
+            state.log(self.name, "DECISION", f"Sentiment {senti['sentiment']} ({senti['sentiment_source']}): "
+                      + (", ".join(senti["sentiment_evidence"][:6]) or "no sentiment cue"))
         return Agent1Output(
+            **senti,
             feedback_type=raw.feedback_type, secondary_types=list(raw.secondary_types), issues=issues,
             is_ambiguous=is_amb, ambiguity_reasons=reasons, missing_information=missing, status=status,
             reasoning=raw.reasoning, dialect_terms=dialect, revision_round=revision_round, reasoner=reasoner,

@@ -244,21 +244,30 @@ def build_executive_report(ins: dict) -> bytes:
     pdf.rect(0, 0, pdf.w, 46, "F")
     pdf.set_fill_color(*ACCENT)
     pdf.rect(0, 46, pdf.w, 1.6, "F")
-    pdf.set_xy(16, 9)
-    pdf._font(16, True, WHITE)
-    pdf.cell(0, 8, config.APP_TITLE_EN, new_x="LMARGIN", new_y="NEXT")
+    x0 = 16
+    if config.LOGO_PATH.exists():
+        pdf.image(str(config.LOGO_PATH), x=16, y=8, h=30)
+        x0 = 52
+    pdf.set_xy(x0, 9)
+    avail = pdf.w - x0 - 16
+    size = 15.0
+    pdf._font(size, True, WHITE)
+    while pdf.get_string_width(config.APP_TITLE_EN) > avail and size > 9:  # keep the title inside the band
+        size -= 0.5
+        pdf._font(size, True, WHITE)
+    pdf.cell(avail, 8, config.APP_TITLE_EN, new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_shaping(True, direction="rtl")
-    pdf._font(12, True, (214, 236, 223))
-    pdf.set_x(16)
-    pdf.cell(pdf.w - 32, 7, config.APP_TITLE_AR, align="R", new_x="LMARGIN", new_y="NEXT")
+    pdf._font(11.5, True, (214, 236, 223))
+    pdf.set_x(x0)
+    pdf.cell(avail, 7, config.APP_TITLE_AR, align="L", new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_shaping(True, direction="ltr")
-    pdf.set_xy(16, 27)
+    pdf.set_xy(x0, 26)
     pdf._font(9, color=(214, 236, 223))
     pdf.cell(0, 5, f"Executive report on beneficiary feedback · analysis date {cov['analysis_date']}", new_x="LMARGIN", new_y="NEXT")
     lw = pdf.get_string_width(ins["label"]) + 8
     pdf.set_fill_color(*ACCENT)
-    pdf.rect(16, 35, lw, 6.5, "F")
-    pdf.set_xy(16, 35)
+    pdf.rect(x0, 34, lw, 6.5, "F")
+    pdf.set_xy(x0, 34)
     pdf._font(8, True, WHITE)
     pdf.cell(lw, 6.5, ins["label"], align="C")
     pdf.set_y(53)

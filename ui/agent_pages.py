@@ -58,35 +58,82 @@ def _trace(state: WorkflowState, agents: tuple[str, ...]) -> None:
 # =========================================================================== #
 # Agent 1
 # =========================================================================== #
+FTYPE_LABEL = {"General Complaint": "Complaint"}  # display name used on the Agent 1 page
+SENTI_COLOR = {"Positive": "#0CA30C", "Negative": "#D03B3B", "Neutral": "#8A9690", "Mixed": "#C97E00"}
+
+
+def _ft(t: str) -> str:
+    return FTYPE_LABEL.get(t, t)
+
+
 def page_agent1() -> None:
+    import altair as alt
+
     c = ctx()
     C.page_header("🔍 Agent 1 — Feedback Analysis · وكيل تحليل الملاحظات",
-                  "Understands the Arabic review, extracts independent issues with verbatim evidence, classifies the feedback type "
-                  "and the EGSQUAL service-quality dimension, and flags ambiguous or incomplete feedback.", C.AGENTS["Agent1"]["color"])
+                  "Step 1 sentiment → Step 2 feedback type and independent issues → Step 3 EGSQUAL dimension → Step 4 Arabic "
+                  "evidence and ambiguity. Its outputs are handed to Agent 2.", C.AGENTS["Agent1"]["color"])
     states = analysed()
     if not states:
         return _no_results()
     issues = sum(len(s.agent1.issues) for s in states)
     C.kpi_row([("Reviews analysed", len(states), "input to Agent 1"),
-               ("Issues extracted", issues, f"{issues / len(states):.2f} per review"),
-               ("Multi-issue reviews", sum(len(s.agent1.issues) >= 2 for s in states), "2+ independent issues"),
+               ("Negative or mixed", sum(s.agent1.sentiment in ("Negative", "Mixed") for s in states), "sentiment of the text"),
+               ("Issues extracted", issues, f"{sum(len(s.agent1.issues) >= 2 for s in states)} review(s) with 2+ issues"),
                ("Ambiguous / incomplete", sum(s.agent1.is_ambiguous for s in states), "need clarification", "warn")])
-    st.dataframe(pd.DataFrame([{"Review ID": s.review.review_id, "Application": s.review.app_name,
-                                "Feedback type": s.agent1.feedback_type, "Issues": len(s.agent1.issues),
-                                "EGSQUAL dimensions": ", ".join(dict.fromkeys(i.dimension_name.split(" (")[0] for i in s.agent1.issues)) or "—",
-                                "Ambiguous": "yes" if s.agent1.is_ambiguous else "no", "Status": s.agent1.status.value}
-                               for s in states]), hide_index=True, width="stretch", height=min(320, 38 + 35 * len(states)))
+
+    g1, g2 = st.columns([2, 3])
+    with g1, st.container(border=True):
+        st.markdown("**1 · Sentiment distribution**")
+        order = ["Positive", "Neutral", "Mixed", "Negative"]
+        counts = pd.Series([s.agent1.sentiment for s in states]).value_counts().reindex(order, fill_value=0)
+        df = counts.rename_axis("sentiment").reset_index(name="reviews")
+        base = alt.Chart(df).encode(y=alt.Y("sentiment:N", sort=order, title=None, axis=alt.Axis(labelOverlap=False)),
+                                    x=alt.X("reviews:Q", title="Reviews"),
+                                    tooltip=["sentiment", "reviews"])
+        chart = (base.mark_bar(cornerRadiusEnd=4, height={"band": 0.6}).encode(
+                     color=alt.Color("sentiment:N", scale=alt.Scale(domain=order, range=[SENTI_COLOR[o] for o in order]), legend=None))
+                 + base.mark_text(align="left", dx=4).encode(text="reviews:Q")).properties(height=170)
+        st.altair_chart(chart.configure_view(strokeWidth=0), width="stretch")
+    with g2:
+        st.dataframe(pd.DataFrame([{"Review ID": s.review.review_id, "Sentiment": s.agent1.sentiment,
+                                    "Feedback type": _ft(s.agent1.feedback_type), "Issues": len(s.agent1.issues),
+                                    "EGSQUAL dimensions": ", ".join(dict.fromkeys(i.dimension_name.split(" (")[0] for i in s.agent1.issues)) or "—",
+                                    "Ambiguous": "yes" if s.agent1.is_ambiguous else "no"} for s in states]),
+                     hide_index=True, width="stretch", height=230)
+
     state = _select(states, "a1")
+    a1 = state.agent1
     _review_box(state)
-    if state.agent1.issues:
-        _rtl_table(pd.DataFrame([{"Issue": i.issue_id, "Type": i.issue_type, "Dimension": i.dimension_name.split(" (")[0],
-                                  "EGSQUAL (provisional)": i.egsqual_candidate or "—", "Evidence": i.evidence}
-                                 for i in state.agent1.issues]), ("Evidence",))
+    sec = ", ".join(_ft(t) for t in a1.secondary_types)
+    C.md(f'<div class="card"><div style="display:flex;gap:28px;flex-wrap:wrap">'
+         f'<div><div class="small">1 · SENTIMENT</div><div>{C.pill(a1.sentiment, "navy")} '
+         f'<span class="small">score {a1.sentiment_score:+.2f} · {C.esc(a1.sentiment_source or "—")}</span></div></div>'
+         f'<div><div class="small">2 · FEEDBACK TYPE</div><div>{C.pill(_ft(a1.feedback_type), "teal")}'
+         f'{" <span class=small>also: " + C.esc(sec) + "</span>" if sec else ""}</div></div>'
+         f'<div><div class="small">3 · EGSQUAL DIMENSIONS</div><div>'
+         + ("".join(C.pill(d, "outline") for d in dict.fromkeys(i.dimension_name.split(" (")[0] for i in a1.issues)) or C.pill("— no issue", "muted"))
+         + f'</div></div><div><div class="small">AMBIGUITY</div><div>'
+         f'{C.pill("Ambiguous / incomplete", "warn") if a1.is_ambiguous else C.pill("Specific", "ok")}</div></div></div>'
+         + ('<div class="small" style="margin-top:8px">Sentiment evidence: </div><div class="rtl" dir="rtl">'
+            + " · ".join(C.esc(x) for x in a1.sentiment_evidence) + "</div>" if a1.sentiment_evidence else "")
+         + "</div>")
+    st.markdown("**4 · Supporting Arabic evidence per issue**")
+    if a1.issues:
+        _rtl_table(pd.DataFrame([{"Issue": i.issue_id, "Type": _ft(i.issue_type), "EGSQUAL dimension": i.dimension_name.split(" (")[0],
+                                  "Provisional EGSQUAL": i.egsqual_candidate or "—", "Evidence": i.evidence}
+                                 for i in a1.issues]), ("Evidence",))
     else:
-        st.caption(f"No operational issue extracted · feedback type {state.agent1.feedback_type}"
-                   + (" · ambiguous: " + "; ".join(state.agent1.ambiguity_reasons) if state.agent1.is_ambiguous else ""))
-    with st.expander("View Details — reasoning, dimension definitions, dialect terms, trace"):
+        st.caption("No operational issue extracted.")
+    if a1.is_ambiguous or a1.missing_information:
+        st.warning("**Ambiguous or incomplete:** " + "; ".join(a1.ambiguity_reasons or ["—"])
+                   + ("  \n**Missing information:** " + ", ".join(a1.missing_information) if a1.missing_information else ""))
+    with st.expander("View Details — reasoning, dimension definitions, dialect terms, hand-over to Agent 2"):
         _agent1_panel(state, c.llm)
+        handoff = [m for m in state.messages if m.sender == "Agent1" and m.receiver == "Agent2"]
+        if handoff:
+            st.markdown("**Hand-over to Agent 2**")
+            C.message_timeline(handoff)
         _trace(state, ("Agent1",))
 
 

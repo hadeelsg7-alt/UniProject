@@ -29,6 +29,7 @@ DimensionLit = Literal[
     "INFORMATION_QUALITY",
     "UNMAPPED",  # evidence does not show which aspect of the service failed
 ]
+SentimentLit = Literal["Positive", "Negative", "Neutral", "Mixed"]
 ServiceCompletionLit = Literal["BLOCKED", "PARTIALLY_BLOCKED", "DEGRADED", "NOT_AFFECTED"]
 ScopeLit = Literal["INDIVIDUAL", "RECURRING", "WIDESPREAD"]
 RiskFlagLit = Literal["FINANCIAL", "PERSONAL_DATA_SECURITY", "SAFETY", "LEGAL_DEADLINE"]
@@ -109,6 +110,9 @@ class LLMIssue(BaseModel):
 
 
 class LLMAgent1Analysis(BaseModel):
+    sentiment: Optional[SentimentLit] = Field(default=None, description="Sentiment of the whole comment; Mixed when it "
+                                              "contains both clearly positive and clearly negative statements")
+    sentiment_evidence: list[str] = Field(default_factory=list, description="Exact spans from the review that carry the sentiment")
     feedback_type: FeedbackTypeLit
     secondary_types: list[FeedbackTypeLit] = Field(default_factory=list)
     issues: list[LLMIssue] = Field(default_factory=list)
@@ -202,6 +206,10 @@ class Issue(BaseModel):
 
 
 class Agent1Output(BaseModel):
+    sentiment: str = "Neutral"            # step 1: Positive / Negative / Neutral / Mixed
+    sentiment_score: float = 0.0          # -1 (negative) .. +1 (positive)
+    sentiment_evidence: list[str] = Field(default_factory=list)  # Arabic spans that carry the sentiment
+    sentiment_source: str = ""            # "LLM" or "lexicon"
     feedback_type: FeedbackTypeLit
     secondary_types: list[str] = Field(default_factory=list)
     issues: list[Issue] = Field(default_factory=list)

@@ -21,10 +21,22 @@ def md(markup: str) -> None:
 # --------------------------------------------------------------------------- #
 # Page furniture
 # --------------------------------------------------------------------------- #
-def hero(title: str, subtitle: str, tags: Iterable[str] = (), title_ar: str = "") -> None:
+def logo_data_uri() -> str:
+    import base64
+
+    import config
+    try:
+        return "data:image/png;base64," + base64.b64encode(config.LOGO_PATH.read_bytes()).decode()
+    except OSError:
+        return ""
+
+
+def hero(title: str, subtitle: str, tags: Iterable[str] = (), title_ar: str = "", logo: bool = False) -> None:
     tag_html = "".join(f'<span class="tag">{esc(t)}</span>' for t in tags)
     ar = f'<div class="hero-ar" dir="rtl">{esc(title_ar)}</div>' if title_ar else ""
-    md(f'<div class="hero"><h1>{esc(title)}</h1>{ar}<p>{esc(subtitle)}</p><div class="tagrow">{tag_html}</div></div>')
+    uri = logo_data_uri() if logo else ""
+    img = f'<img class="hero-logo" src="{uri}" alt="logo">' if uri else ""
+    md(f'<div class="hero">{img}<h1>{esc(title)}</h1>{ar}<p>{esc(subtitle)}</p><div class="tagrow">{tag_html}</div></div>')
 
 
 def page_header(title: str, line: str, color: str = "#0E3B2C") -> None:

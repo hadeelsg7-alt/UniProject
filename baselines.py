@@ -33,7 +33,7 @@ from llm import LLMClient, LLMError
 from schemas import DimensionLit, FeedbackTypeLit, ReviewInput, SimulatedTicket
 
 ActionLit = Literal["TECH_TICKET", "SERVICE_IMPROVEMENT", "REQUEST_INFO", "FOLLOW_UP", "ESCALATION_CANDIDATE", "NO_ACTION"]
-SentimentLit = Literal["Negative", "Neutral", "Positive"]
+SentimentLit = Literal["Negative", "Neutral", "Positive", "Mixed"]
 SeverityLit = Literal["None", "Low", "Medium", "High", "Critical"]
 PriorityLit = Literal["None", "P1", "P2", "P3", "P4"]
 CODE_TO_ACTION = {v: k for k, v in ACTION_CODES.items()}

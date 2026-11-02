@@ -164,6 +164,8 @@ section[data-testid="stSidebar"] a[data-testid="stSidebarNavLink"][aria-current=
                                  background: #F7FAF8 !important; padding: 14px 16px 6px 16px !important; }}
 [class*="st-key-frame_Agent"] .kpi {{ border-top-color: var(--agent) !important; border-color: var(--agent); }}
 /* Arabic title and compact page header */
+.hero .hero-logo {{ float: left; width: 84px; height: 84px; margin: 2px 22px 8px 0; border-radius: 18px;
+                   box-shadow: 0 0 0 2px rgba(255,255,255,0.25); }}
 .hero .hero-ar {{ font-family: 'IBM Plex Sans Arabic', 'Geeza Pro', Tahoma, sans-serif; font-size: 1.35rem; font-weight: 700;
                  color: #D6ECDF; text-align: right; margin: -4px 0 6px 0; }}
 .page-head {{ border-left: 6px solid var(--navy); background: #fff; border-radius: 12px; padding: 12px 16px; margin: 0 0 14px 0;

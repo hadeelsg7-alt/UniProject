@@ -3,7 +3,6 @@ st.session_state["ctx"] by app.py. Results of every run are kept in a session
 store so the overview dashboard reflects only analyses that really ran."""
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from datetime import date
 from typing import Optional
@@ -11,16 +10,15 @@ from typing import Optional
 import pandas as pd
 import streamlit as st
 
-import evaluation
 import tools
 from data_loader import row_to_review
-from scenarios import get_scenarios, verify_against_dataset
+from scenarios import get_scenarios
 from schemas import ReviewInput, WorkflowState
 from ui import charts as CH
 from ui import components as C
 from ui import theme as T
 from ui.result_view import render_result, run_live
-from workflow import state_to_dict, state_to_row
+from workflow import state_to_row
 
 
 @dataclass
@@ -218,10 +216,12 @@ def page_dashboard() -> None:
 
     states = list(store().values())
     if not states:
-        C.empty_state("📊", "No analysis yet", "Run a sample above, analyse a single review, or run a batch — the KPIs and charts "
+        C.empty_state("📊", "No analysis yet", "Run a sample above or analyse a single review — the KPIs and charts "
                       "are computed from those real results only.")
         return
     agent_results(states, "dash")
+    st.download_button("⬇️ Download all results (CSV)", pd.DataFrame([state_to_row(x) for x in states]).to_csv(index=False).encode("utf-8-sig"),
+                       "analysis_results.csv", "text/csv")
 
 
 # =========================================================================== #
@@ -235,28 +235,21 @@ EXAMPLES = {
 }
 
 
+def _scenario_label(s) -> str:
+    return f"Test scenario {s.key} — {s.title}" + (" (synthetic)" if s.synthetic else "")
+
+
 def page_analyze() -> None:
     c = ctx()
-    C.hero("Analyse Beneficiary Feedback", "Type an Arabic review, pick one from the dataset or upload a CSV — then watch the three agents work.",
+    C.hero("Analyse Beneficiary Feedback", "Type an Arabic review, load an example or test scenario, or pick one from the dataset — then watch the three agents work.",
            ["RTL Arabic", "Saudi dialect", "Live agent trace"])
     C.mode_banner(c.llm)
     C.agents_overview(compact=True)
-    mode = st.segmented_control("Input", ["✍️ Type a review", "📚 Pick from dataset", "📤 Upload CSV"],
-                                default="✍️ Type a review", key="an_mode")
+    mode = st.segmented_control("Input", ["✍️ Type or load an example", "📚 Pick from dataset"],
+                                default="✍️ Type or load an example", key="an_mode")
     review: Optional[ReviewInput] = None
-    if mode == "✍️ Type a review":
-        ex = st.selectbox("Load an example (written by the researcher, not from the dataset)", ["—"] + list(EXAMPLES), key="an_ex")
-        if ex != "—" and st.session_state.get("an_ex_loaded") != ex:
-            app, rating, text = EXAMPLES[ex]
-            st.session_state.update({"an_text": text, "an_app": app, "an_rating": rating, "an_ex_loaded": ex})
-        txt = st.text_area("Arabic review", key="an_text", height=110, placeholder="اكتب مراجعة المستفيد هنا…")
-        a, b = st.columns(2)
-        st.session_state.setdefault("an_app", "CUSTOM")
-        app = a.text_input("Application", key="an_app")
-        rating = b.selectbox("Star rating", [None, 1, 2, 3, 4, 5], key="an_rating")
-        if txt and txt.strip():
-            review = ReviewInput(review_id="TYPED-1", text=txt.strip(), app_id=app or "CUSTOM", app_name=app or "CUSTOM", rating=rating)
-    elif mode == "📚 Pick from dataset":
+    ref_date = c.ref_date
+    if mode == "📚 Pick from dataset":
         sub = review_picker("an")
         if sub is not None and not sub.empty:
             opts = sub.head(500)
@@ -264,21 +257,36 @@ def page_analyze() -> None:
                                format_func=lambda i: f"{opts.at[i, 'review_id']} · {opts.at[i, 'app_id']} · ★{opts.at[i, 'rating']} · {opts.at[i, 'text'][:80]}")
             review = row_to_review(opts.loc[idx])
     else:
-        up = st.file_uploader("Upload a reviews CSV (UTF-8; needs a review-text column such as 'Content')", type=["csv"], key="an_upload")
-        if up is not None:
-            st.session_state["dataset_bytes"] = up.getvalue()
-            st.session_state["dataset_name"] = up.name
-            st.success(f"Loaded {up.name}. It is now the active dataset — use “Pick from dataset”, Batch or the Dashboard.")
-            st.rerun()
-        if c.info:
-            st.caption(f"Active dataset: {st.session_state.get('dataset_name', 'data/reviews.csv')} · {c.info['rows_available']:,} unique reviews")
+        scen = {_scenario_label(s): s for s in get_scenarios()}
+        ex = st.selectbox("Load an example or a test scenario (S6 shows the review loop, S8 a simulated escalation)",
+                          ["—"] + list(EXAMPLES) + list(scen), key="an_ex")
+        if ex != "—" and st.session_state.get("an_ex_loaded") != ex:
+            if ex in scen:
+                r = scen[ex].review
+                st.session_state.update({"an_text": r.text, "an_app": r.app_id, "an_rating": r.rating})
+            else:
+                app, rating, text = EXAMPLES[ex]
+                st.session_state.update({"an_text": text, "an_app": app, "an_rating": rating})
+            st.session_state["an_ex_loaded"] = ex
+        txt = st.text_area("Arabic review", key="an_text", height=110, placeholder="اكتب مراجعة المستفيد هنا…")
+        a, b = st.columns(2)
+        st.session_state.setdefault("an_app", "CUSTOM")
+        app = a.text_input("Application", key="an_app")
+        rating = b.selectbox("Star rating", [None, 1, 2, 3, 4, 5], key="an_rating")
+        sc = scen.get(ex)
+        if sc is not None and txt.strip() == sc.review.text.strip():  # unchanged scenario: keep its id, flags and SLA date
+            review, ref_date = sc.review, sc.reference_date or c.ref_date
+            if sc.synthetic:
+                st.warning(f"🧪 Synthetic scenario: the review and its complaint record are artificial. SLA reference date fixed at {sc.reference_date}.")
+        elif txt and txt.strip():
+            review = ReviewInput(review_id="TYPED-1", text=txt.strip(), app_id=app or "CUSTOM", app_name=app or "CUSTOM", rating=rating)
 
     if review is not None:
         C.section("Original review", "right-to-left")
         C.md(f'<div class="review-box"><div class="rtl">{C.esc(review.text)}</div></div>')
     run = st.button("▶ Run Multi-Agent Analysis", type="primary", disabled=review is None, key="an_run")
     if run and review is not None:
-        state = run_live(c.workflow, review, c.ref_date, c.llm)
+        state = run_live(c.workflow, review, ref_date, c.llm)
         st.session_state["an_state"] = state
         remember([state], "single")
     if "an_state" in st.session_state:
@@ -286,135 +294,7 @@ def page_analyze() -> None:
 
 
 # =========================================================================== #
-# 3. Scenarios
-# =========================================================================== #
-def page_scenarios() -> None:
-    c = ctx()
-    C.hero("Test Scenarios", "Eight real reviews from the dataset and one clearly labelled synthetic case for the escalation logic.",
-           ["Clear technical issue", "Multiple issues", "Ambiguous", "Praise + suggestion", "High impact", "Escalation"])
-    C.mode_banner(c.llm)
-    scen = get_scenarios()
-    ver = verify_against_dataset()
-    keys = [s.key for s in scen]
-    cols = st.columns(3)
-    for i, s in enumerate(scen):
-        with cols[i % 3]:
-            src = "🧪 SYNTHETIC" if s.synthetic else (f"✅ dataset row {s.original_row}" if ver["checked"].get(s.key) else f"dataset row {s.original_row}")
-            C.md(f'<div class="card" style="min-height:150px"><div style="display:flex;justify-content:space-between">'
-                 f'{C.pill(s.key, "navy")}<span class="small">{C.esc(src)}</span></div><h4 style="margin-top:6px">{C.esc(s.title)}</h4>'
-                 f'<div class="small">{C.esc(s.purpose)}</div></div>')
-    pick = st.segmented_control("Choose a scenario", keys, default=keys[0], key="sc_pick")
-    sc = next(s for s in scen if s.key == pick) if pick else scen[0]
-    if sc.synthetic:
-        st.warning(f"🧪 Synthetic scenario: the review and complaint record SYN-2026-0417 are artificial. SLA reference date fixed at {sc.reference_date}.")
-    C.md(f'<div class="review-box"><div class="rtl">{C.esc(sc.review.text)}</div></div>')
-    if sc.expect:
-        st.caption("Design expectations (what this scenario should demonstrate — not ground truth): "
-                   + ", ".join(f"{k}={v}" for k, v in sc.expect.items()))
-    if st.button(f"▶ Run scenario {sc.key}", type="primary", key="sc_run"):
-        state = run_live(c.workflow, sc.review, sc.reference_date or c.ref_date, c.llm)
-        st.session_state["sc_state"] = (sc.key, state)
-        remember([state], "scenario")
-        checks = evaluation.behavioural_checks(state, sc.expect)
-        st.session_state["sc_checks"] = (sc.key, checks)
-    if st.session_state.get("sc_state", (None,))[0] == sc.key:
-        checks = st.session_state.get("sc_checks", (None, []))[1]
-        if checks:
-            ok = sum(1 for x in checks if x.passed)
-            app_ = sum(1 for x in checks if x.passed is not None)
-            (st.success if ok == app_ else st.error)(f"Behavioural checks for {sc.key}: {ok}/{app_} passed")
-        render_result(st.session_state["sc_state"][1], c.llm, f"sc_{sc.key}")
-
-
-# =========================================================================== #
-# 4. Batch
-# =========================================================================== #
-def page_batch() -> None:
-    c = ctx()
-    C.hero("Batch Analysis", "Run the agents on many reviews, compare outcomes and drill into any single result.", ["Filters", "Charts", "CSV / JSON export"])
-    C.mode_banner(c.llm)
-    sub = review_picker("bt")
-    if sub is None:
-        return
-    a, b = st.columns([1, 3])
-    how = a.radio("Selection", ["First N", "Random N", "Pick reviews"], key="bt_how")
-    if how == "Pick reviews":
-        opts = sub.head(500)
-        picked = b.multiselect("Reviews", opts.index, key="bt_picked",
-                               format_func=lambda i: f"{opts.at[i, 'review_id']} · {opts.at[i, 'text'][:70]}")
-        batch = opts.loc[picked]
-    else:
-        n = b.number_input("N", 1, 2000, 20, key="bt_n")
-        batch = sub.head(int(n)) if how == "First N" else sub.sample(min(int(n), len(sub)), random_state=42)
-    st.caption(f"{len(batch)} review(s) selected" + (" · LLM mode: about 2–4 API calls per review" if c.llm.available else ""))
-    if st.button("▶ Run batch analysis", type="primary", disabled=batch.empty, key="bt_run"):
-        states = run_batch_with_progress([row_to_review(r) for _, r in batch.iterrows()], "Batch")
-        st.session_state["batch_states"] = states
-        remember(states, "batch")
-    states = st.session_state.get("batch_states")
-    if not states:
-        return
-    rows = agent_results(states, "batch", show_rating_chart=False)
-    C.section("All results")
-    st.dataframe(rows[["review_id", "app_id", "rating", "review_text", "feedback_type", "n_issues", "overall_severity",
-                       "overall_priority", "revision_rounds", "action", "escalation_status"]], hide_index=True, width="stretch", height=320)
-    d1, d2 = st.columns(2)
-    d1.download_button("⬇️ Batch results (CSV)", rows.to_csv(index=False).encode("utf-8-sig"), "batch_results.csv", "text/csv", width="stretch")
-    d2.download_button("⬇️ Batch results (JSON)", json.dumps([state_to_dict(s) for s in states], ensure_ascii=False, indent=1),
-                       "batch_results.json", "application/json", width="stretch")
-    C.section("Inspect one result")
-    pick = st.selectbox("Result", range(len(states)), key="bt_inspect",
-                        format_func=lambda i: f"{states[i].review.review_id} · {states[i].review.text[:80]}")
-    render_result(states[pick], c.llm, f"bt_{pick}")
-
-
-# =========================================================================== #
-# 5. Evaluation
-# =========================================================================== #
-def page_evaluation() -> None:
-    c = ctx()
-    C.hero("Evaluation", "Rule-compliance checks on the test scenarios, and Precision / Recall / F1 only against verified reference labels.",
-           ["No fabricated scores", "Scenario-based", "Optional labelled evaluation"])
-    C.mode_banner(c.llm)
-
-    C.section("1 · Behavioural checks on the scenarios", "rule compliance & evidence support — not accuracy")
-    if st.button("▶ Run all scenarios and evaluate", type="primary", key="ev_run"):
-        res = []
-        bar = st.progress(0.0)
-        scen = get_scenarios()
-        for k, s in enumerate(scen):
-            st_ = c.workflow.run(s.review, reference_date=s.reference_date or c.ref_date)
-            res.append((s.key, st_, s.expect))
-            bar.progress((k + 1) / len(scen), text=f"{s.key}")
-        bar.empty()
-        remember([r[1] for r in res], "scenario")
-        st.session_state["ev_checks"] = evaluation.checks_table(res)
-    chk = st.session_state.get("ev_checks")
-    if chk is None:
-        C.empty_state("🧪", "Not run yet", "Click the button to run the scenarios and their checks.")
-    else:
-        s = evaluation.summary(chk)
-        C.kpi_row([("Checks passed", f"{s['checks_passed']} / {s['applicable']}", "applicable checks", ""),
-                   ("Checks failed", s["checks_failed"], "", "crit" if s["checks_failed"] else ""),
-                   ("Not applicable", s["not_applicable"], "e.g. no issues to verify", "navy"),
-                   ("Scenarios", chk["scenario"].nunique(), "8 real + 1 synthetic", "navy")])
-        a, b = st.columns([2, 3])
-        with a:
-            st.altair_chart(CH.checks_by_scenario(chk), width="stretch")
-        with b:
-            only = st.segmented_control("Show", ["All", "FAIL", "PASS", "N/A"], default="All", key="ev_filter")
-            view = chk if (not only or only == "All") else chk[chk["result"] == only]
-            st.dataframe(view, hide_index=True, width="stretch", height=360)
-
-    C.section("2 · Precision / Recall / F1 and system comparison", "against verified reference labels")
-    C.md('<div class="card"><h4>📊 Evaluation Dashboard</h4><div class="small">Per-agent Precision / Recall / Macro F1, '
-         'ticket JSON validity, and Multi-Agent vs Single LLM vs Sequential LLM pipeline (Macro F1, Escalation F1, '
-         'processing time, estimated cost) are on the <b>Evaluation Dashboard</b> page in the sidebar. They are computed only '
-         'from human-verified labels you upload there.</div></div>')
-
-
-# =========================================================================== #
-# 6. Methodology & rules
+# 3. Methodology & rules
 # =========================================================================== #
 def page_methodology() -> None:
     C.hero("Methodology & Rules", "How the framework decides — every rule below is editable in knowledge_base/ without code changes.",

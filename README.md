@@ -76,8 +76,8 @@ python run_scenarios.py --only S1 S6        # selected scenarios
 
 ## 2. How to test the scenarios
 
-In the dashboard, open the **Test scenarios** page, choose a scenario (S1–S8) and click **Run scenario**. The
-**Evaluation** page runs all of them at once and shows the behavioural checks.
+In the dashboard, open **Analyse feedback**, pick a scenario (S1–S8) from the example list and click **Run Multi-Agent
+Analysis**. To run all of them with their behavioural checks, use `python run_scenarios.py`.
 
 | Key | Scenario | Source | What it demonstrates |
 |---|---|---|---|
@@ -93,7 +93,7 @@ In the dashboard, open the **Test scenarios** page, choose a scenario (S1–S8) 
 
 Each scenario shows: the original Arabic review, Agent 1/2/3 outputs, the tools used, the inter-agent revision history,
 the decision log and the final operational decision. When `data/reviews.csv` is present, every real scenario is checked
-to exist verbatim in the dataset (✅ on the Test scenarios page).
+to exist verbatim in the dataset (checked by `run_scenarios.py`).
 
 ---
 
@@ -130,8 +130,8 @@ to exist verbatim in the dataset (✅ on the Test scenarios page).
 | `ui/theme.py` | Design tokens (navy / white / teal), validated chart palettes, global CSS incl. RTL Arabic |
 | `ui/components.py` | Reusable components: KPI cards, severity/priority badges, workflow diagram, evidence highlighting, issue and assessment cards, message timeline, escalation checklist, ticket |
 | `ui/charts.py` | Altair charts (categories, EGSQUAL dimensions, priority, severity, severity-by-rating, checks, P/R/F1) |
-| `ui/result_view.py` | The multi-agent result screen: live run, step-by-step replay, three agent panels, communication, audit trail, export |
-| `ui/pages.py` | Pages: Dashboard, Analyse feedback, Test scenarios, Batch analysis, Evaluation, Methodology & rules |
+| `ui/result_view.py` | The multi-agent result screen: live run, workflow diagram, three agent panels, communication and log, JSON export |
+| `ui/pages.py` | Pages: Dashboard, Analyse feedback (including the test scenarios), Methodology & rules |
 | `.streamlit/config.toml` | Light navy/teal theme for presentations |
 | `agents/agent1.py` | Feedback Investigation Agent |
 | `agents/agent2.py` | Impact Assessment & Prioritization Agent |
@@ -146,9 +146,9 @@ to exist verbatim in the dataset (✅ on the Test scenarios page).
 | `data_loader.py` | CSV loading: column detection, UTF-8, missing values, duplicates |
 | `scenarios.py`, `run_scenarios.py` | Scenario definitions and the command-line runner and report |
 | `evaluation.py` | Behavioural checks and optional P/R/F1 |
-| `evaluation_suite.py` | Evaluation Dashboard metrics: label normalisation, annotation sheet, per-agent P/R/Macro F1, ticket & escalation F1, JSON validity, time and estimated cost |
+| `evaluation_suite.py` | Evaluation page metrics: label normalisation, annotation sheet, per-agent P/R/Macro F1, ticket & escalation F1, JSON validity, time and estimated cost |
 | `baselines.py` | Comparison baselines: Single LLM and Sequential LLM pipeline (same knowledge, no tools / verification / loop) |
-| `ui/eval_dashboard.py` | The Evaluation Dashboard page |
+| `ui/eval_dashboard.py` | The Evaluation page |
 | `knowledge_base/*.json` | EGSQUAL dimensions, dialect glossary, severity/priority rules, escalation rules, synthetic complaint history |
 | `tests/` | Unit, agent, workflow, scenario and LLM-path tests |
 
@@ -227,7 +227,7 @@ You can change all thresholds in `knowledge_base/*.json` without touching the co
   - that the loop stayed within its bound.
 
   These are **rule-compliance checks, not accuracy scores**.
-- **Evaluation Dashboard** (`evaluation_suite.py`, `baselines.py`, *Evaluation Dashboard* page) implements the evaluation plan.
+- **Evaluation** (`evaluation_suite.py`, `baselines.py`, *Evaluation* page) implements the evaluation plan.
   All metrics are computed **only** from human-verified reference labels that you upload. The dataset has no labels, so no
   accuracy figures are claimed.
   1. Export a stratified annotation sheet (blank label columns) and the guidelines. Label it, then upload it.
@@ -315,14 +315,10 @@ Launch with `streamlit run app.py` and open <http://localhost:8501>.
 
 | Page | What to show |
 |---|---|
-| **Dashboard** | Dataset KPIs, then **Run sample analysis** to get KPIs and interactive charts. The KPIs are reviews analysed, issues extracted, High/Critical, P1/P2, simulated tickets and revision loops. The charts are feedback categories, EGSQUAL dimensions, priority, severity, and *severity vs star rating*. Everything is computed only from reviews actually analysed in the session. |
-| **Analyse feedback** | Type a review (or load a researcher-written example), pick one from the dataset, or upload a CSV. The pipeline shows the active agent live. The result shows the decision summary, a workflow diagram with a revision counter, **step-by-step replay** of the real trace, and tabs for each agent, communication, audit trail and export. |
-| **Test scenarios** | S1–S8 cards. **S6** shows a real Agent 2 → Agent 1 revision; **S8** (synthetic) shows an escalation candidate awaiting human approval. |
-| **Batch analysis** | Filters, KPIs, charts, a results table, CSV/JSON export and drill-down into any result. |
-| **Evaluation** | Behavioural checks on the scenarios (pass/fail chart). |
-| **Evaluation Dashboard** | Annotation sheet export, then label upload. It shows per-agent P/R/Macro F1 (framed per agent) with confusion matrices, ticket/escalation F1 and JSON validity, and the Multi-Agent vs Single LLM vs Sequential pipeline comparison (Macro F1, Escalation F1, time, estimated cost). |
+| **Dashboard** | Dataset KPIs, then **Run sample analysis** to get KPIs and interactive charts grouped by agent: issues, feedback categories, EGSQUAL dimensions, severity, priority, *severity vs star rating*, actions and escalation status. Everything is computed only from reviews actually analysed in the session; the results download as CSV. |
+| **Analyse feedback** | Type a review, load an example or a test scenario (S6 shows a real Agent 2 → Agent 1 revision; S8, synthetic, shows an escalation candidate awaiting human approval), or pick one from the dataset. The pipeline shows the active agent live; the result shows the final decision, the workflow diagram and one tab per agent plus the communication log. |
+| **Evaluation** | Upload the reference labels, run the systems, and read per-agent P/R/Macro F1, ticket and escalation F1, JSON validity, and the Multi-Agent vs Single LLM vs Sequential pipeline comparison (Macro F1, Escalation F1, time, estimated cost). Statistical tests are in a collapsed *Advanced* section. |
 | **Methodology & rules** | EGSQUAL definitions, the R1–R4 / P-rules and the E1–E5 escalation rules. |
 
-The step replay and live view are driven by the workflow's own callbacks and trace (`node_log_index`,
-`agent1_history`, `agent2_history`), so each step shows only what existed at that point. Revision arrows and
+The live view is driven by the workflow's own callbacks and trace, so it shows only what existed at each point. Revision arrows and
 counters appear only when a review request really occurred.

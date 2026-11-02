@@ -76,10 +76,7 @@ st.session_state["ctx"] = P.Ctx(llm=llm, workflow=MultiAgentWorkflow(llm, max_re
 nav = st.navigation([
     st.Page(P.page_dashboard, title="Dashboard", icon=":material/space_dashboard:", default=True),
     st.Page(P.page_analyze, title="Analyse feedback", icon=":material/psychology:", url_path="analyse"),
-    st.Page(P.page_scenarios, title="Test scenarios", icon=":material/science:", url_path="scenarios"),
-    st.Page(P.page_batch, title="Batch analysis", icon=":material/stacks:", url_path="batch"),
-    st.Page(P.page_evaluation, title="Evaluation", icon=":material/fact_check:", url_path="evaluation"),
-    st.Page(page_eval_dashboard, title="Evaluation Dashboard", icon=":material/monitoring:", url_path="evaluation-dashboard"),
+    st.Page(page_eval_dashboard, title="Evaluation", icon=":material/monitoring:", url_path="evaluation"),
     st.Page(P.page_methodology, title="Methodology & rules", icon=":material/menu_book:", url_path="methodology"),
 ], position="sidebar")
 nav.run()

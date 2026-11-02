@@ -1,5 +1,5 @@
-"""The multi-agent result screen: live run, workflow replay, the three agent panels,
-communication, audit trail and export. Reads only the WorkflowState."""
+"""The multi-agent result screen: live run, workflow diagram, the three agent panels,
+and the communication log with a JSON export. Reads only the WorkflowState."""
 from __future__ import annotations
 
 import json
@@ -11,7 +11,7 @@ import streamlit as st
 
 from schemas import ReviewInput, WorkflowState
 from ui import components as C
-from workflow import state_to_dict, state_to_row
+from workflow import state_to_dict
 
 
 def run_live(workflow, review: ReviewInput, reference_date: Optional[date], llm) -> WorkflowState:
@@ -56,29 +56,14 @@ def render_result(state: WorkflowState, llm, key: str) -> None:
         C.kpi_row([("Issues", len(a1.issues), a1.feedback_type), ("Revision rounds", f"{state.revision_count}/{state.max_revisions}",
                     "Impact → Investigation Agent", "warn" if state.revision_count else ""), ("Tools called", len(state.tool_calls), "audited")])
 
-    # ---- Workflow + step replay -------------------------------------------
+    # ---- Workflow ---------------------------------------------------------
     C.section("Multi-agent workflow", "driven by the real execution trace")
-    steps = len(state.node_trace)
-    replay = st.toggle("Step-by-step replay", key=f"replay_{key}",
-                       help="Walk through the real execution trace one node at a time.")
-    if replay and steps > 1:
-        k = st.slider("Step", 1, steps, steps, key=f"step_{key}", format="Step %d") - 1
-        C.workflow_diagram(state, step=k, llm=llm)
-        node = state.node_trace[k]
-        lo = state.node_log_index[k] if k < len(state.node_log_index) else 0
-        hi = state.node_log_index[k + 1] if k + 1 < len(state.node_log_index) else len(state.decision_log)
-        st.markdown(f"**Step {k + 1} · {C.NODE_LABEL.get(node, node)}** — {hi - lo} log entr{'y' if hi - lo == 1 else 'ies'}")
-        entries = state.decision_log[lo:hi]
-        if entries:
-            st.dataframe(pd.DataFrame([{"agent": C.agent_name(e.agent), "action": e.action, "detail": e.detail} for e in entries]),
-                         hide_index=True, width="stretch", height=min(320, 38 + 35 * len(entries)))
-    else:
-        C.workflow_diagram(state, llm=llm)
+    C.workflow_diagram(state, llm=llm)
 
     # ---- Agent panels -----------------------------------------------------
-    t1, t2, t3, t4, t5, t6 = st.tabs(["🔍 Agent 1 · Investigation Agent", "⚖️ Agent 2 · Impact Agent", "🎫 Agent 3 · Resolution Agent",
-                                       "💬 Communication", "🧾 Audit trail", "⬇️ Export"],
-                                      key=f"tabs_{key}", on_change="rerun")  # remember the open tab across reruns
+    t1, t2, t3, t4 = st.tabs(["🔍 Agent 1 · Investigation Agent", "⚖️ Agent 2 · Impact Agent", "🎫 Agent 3 · Resolution Agent",
+                              "💬 Communication & log"],
+                             key=f"tabs_{key}", on_change="rerun")  # remember the open tab across reruns
     with t1, st.container(key=f"frame_Agent1_{key}"):
         _agent1_panel(state, llm)
     with t2, st.container(key=f"frame_Agent2_{key}"):
@@ -90,33 +75,17 @@ def render_result(state: WorkflowState, llm, key: str) -> None:
         st.caption(f"{len(state.messages)} message(s) actually exchanged · {req} review request(s) · "
                    f"path: {' → '.join(state.node_trace)}")
         C.message_timeline(state.messages)
-    with t5:
-        names = {"All": "All", "Orchestrator": "Orchestrator", **{k: C.agent_name(k) for k in C.AGENTS}}
-        who = st.segmented_control("Filter by agent", list(names), default="All", key=f"who_{key}",
-                                   format_func=lambda k: names[k])
-        log = pd.DataFrame([e.model_dump() for e in state.decision_log])
-        tl = pd.DataFrame([t.model_dump() for t in state.tool_calls])
-        if who and who != "All":
-            log = log[log["agent"] == who]
-            tl = tl[tl["agent"] == who] if not tl.empty else tl
-        log = log.assign(agent=log["agent"].map(C.agent_name))
-        if not tl.empty:
-            tl = tl.assign(agent=tl["agent"].map(C.agent_name))
-        st.markdown(f"**Decision log** ({len(log)})")
-        st.dataframe(log[["step", "agent", "action", "detail"]], hide_index=True, width="stretch", height=300)
-        st.markdown(f"**Tool calls** ({len(tl)})")
-        if not tl.empty:
-            st.dataframe(tl, hide_index=True, width="stretch", height=260)
-        if state.errors:
-            st.markdown("**Errors / warnings**")
-            for e in state.errors:
-                st.error(e)
-    with t6:
-        d1, d2 = st.columns(2)
-        d1.download_button("⬇️ Full result (JSON)", json.dumps(state_to_dict(state), ensure_ascii=False, indent=2),
-                           file_name=f"result_{r.review_id}.json", mime="application/json", key=f"json_{key}", width="stretch")
-        d2.download_button("⬇️ Summary row (CSV)", pd.DataFrame([state_to_row(state)]).to_csv(index=False).encode("utf-8-sig"),
-                           file_name=f"result_{r.review_id}.csv", mime="text/csv", key=f"csv_{key}", width="stretch")
+        with st.expander(f"Decision log ({len(state.decision_log)} entries) and tool calls ({len(state.tool_calls)})"):
+            log = pd.DataFrame([e.model_dump() for e in state.decision_log])
+            log = log.assign(agent=log["agent"].map(C.agent_name))
+            st.dataframe(log[["step", "agent", "action", "detail"]], hide_index=True, width="stretch", height=300)
+            tl = pd.DataFrame([t.model_dump() for t in state.tool_calls])
+            if not tl.empty:
+                st.dataframe(tl.assign(agent=tl["agent"].map(C.agent_name)), hide_index=True, width="stretch", height=260)
+        for e in state.errors:
+            st.error(e)
+        st.download_button("⬇️ Download full result (JSON)", json.dumps(state_to_dict(state), ensure_ascii=False, indent=2),
+                           file_name=f"result_{r.review_id}.json", mime="application/json", key=f"json_{key}")
 
 
 def _agent_header(state, agent: str, title: str, llm) -> None:

@@ -33,7 +33,7 @@ def _ctx():
 # --------------------------------------------------------------------------- #
 def page_eval_dashboard() -> None:
     c = _ctx()
-    C.hero("Evaluation Dashboard", "Per-agent Precision / Recall / F1 against validated reference labels, ticket JSON validity, "
+    C.hero("Evaluation", "Per-agent Precision / Recall / F1 against validated reference labels, ticket JSON validity, "
            "and Multi-Agent vs Single LLM vs Sequential LLM pipeline on the same test set.",
            ["Human-verified labels only", "No fabricated scores", "Cost = estimate"])
     C.mode_banner(c.llm)
@@ -51,25 +51,26 @@ def page_eval_dashboard() -> None:
 # Step 1: reference labels
 # --------------------------------------------------------------------------- #
 def _step_labels(c):
-    C.section("1 · Reference labels (test set)", "a validated subset labelled by human annotators")
-    a, b = st.columns([3, 2])
-    with a, st.container(border=True):
-        st.markdown("**Create an annotation sheet** · stratified random sample by star rating (seed 42). "
-                    "Label columns are left **blank** on purpose — the system's predictions are not shown to annotators.")
-        if c.df is None:
-            st.caption("Load the reviews dataset (sidebar) to export a sample, or upload your own labelled file with a `text` column.")
-        else:
-            n = st.slider("Sample size", 20, min(500, len(c.df)), min(100, len(c.df)), step=10, key="evd_n")
-            sheet = E.annotation_sheet(c.df, n=n)
-            d1, d2 = st.columns(2)
-            d1.download_button("⬇️ Annotation sheet (CSV)", sheet.to_csv(index=False).encode("utf-8-sig"),
-                               f"annotation_sheet_{n}.csv", "text/csv", width="stretch")
-            d2.download_button("⬇️ Annotation guidelines", E.annotation_guidelines().encode("utf-8"),
-                               "annotation_guidelines.md", "text/markdown", width="stretch")
-    with b, st.container(border=True):
-        st.markdown("**Label columns** (any subset; empty cell = not labelled)")
-        st.dataframe(pd.DataFrame([{"column": k, "agent": C.agent_name(v["agent"]), "values": ", ".join(v["values"] or ["EGSQUAL keys ';'"])}
-                                   for k, v in E.LABEL_SPEC.items()]), hide_index=True, width="stretch", height=320)
+    C.section("1 · Upload the reference labels", "human-verified labels, e.g. evaluation_labels/review_labels_50.xlsx")
+    with st.expander("Optional: create a new annotation sheet, or see the allowed label values"):
+        a, b = st.columns([3, 2])
+        with a, st.container(border=True):
+            st.markdown("**Create an annotation sheet** · stratified random sample by star rating (seed 42). "
+                        "Label columns are left **blank** on purpose — the system's predictions are not shown to annotators.")
+            if c.df is None:
+                st.caption("Load the reviews dataset (sidebar) to export a sample, or upload your own labelled file with a `text` column.")
+            else:
+                n = st.slider("Sample size", 20, min(500, len(c.df)), min(100, len(c.df)), step=10, key="evd_n")
+                sheet = E.annotation_sheet(c.df, n=n)
+                d1, d2 = st.columns(2)
+                d1.download_button("⬇️ Annotation sheet (CSV)", sheet.to_csv(index=False).encode("utf-8-sig"),
+                                   f"annotation_sheet_{n}.csv", "text/csv", width="stretch")
+                d2.download_button("⬇️ Annotation guidelines", E.annotation_guidelines().encode("utf-8"),
+                                   "annotation_guidelines.md", "text/markdown", width="stretch")
+        with b, st.container(border=True):
+            st.markdown("**Label columns** (any subset; empty cell = not labelled)")
+            st.dataframe(pd.DataFrame([{"column": k, "agent": C.agent_name(v["agent"]), "values": ", ".join(v["values"] or ["EGSQUAL keys ';'"])}
+                                       for k, v in E.LABEL_SPEC.items()]), hide_index=True, width="stretch", height=320)
 
     up = st.file_uploader("Upload the labels: CSV, or the Excel review workbook (must contain `review_id`; optional `text`, `rating`, `app_id`)",
                           type=["csv", "xlsx"], key="evd_labels")
@@ -125,7 +126,9 @@ def _step_run(c, ref: pd.DataFrame, labels: dict):
         return None
     llm_ok = c.llm.available
     options = list(E.SYSTEMS)
-    sel = st.multiselect("Systems", options, default=options if llm_ok else ["multi_agent", "multi_agent_no_loop"],
+    plan = ["multi_agent", "single_llm", "sequential"]  # the three systems of the evaluation plan
+    sel = st.multiselect("Systems (the evaluation plan compares the first three; the other two are optional extras)", options,
+                         default=plan if llm_ok else ["multi_agent"],
                          format_func=E.SYSTEMS.get, key="evd_systems")
     with st.expander("What each system is (same Claude model and same knowledge for all — only the architecture differs)"):
         st.dataframe(pd.DataFrame([{"system": E.SYSTEMS[k], "role": E.SYSTEM_ROLE[k]} for k in E.SYSTEMS]),
@@ -350,7 +353,7 @@ def _proof(run: E.EvalRun, labels: dict) -> None:
     reviews = st.session_state.get("evd_reviews") or {}
     colors = E.SYSTEM_COLORS
     tab = E.overall_table(labels, run.results, run.prices, reviews)
-    with st.container(key="frame_Overall_proof"):
+    with st.expander("🧪 Advanced: statistical tests, reliability and hard cases", expanded=False), st.container(key="frame_Overall_proof"):
         C.md('<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">'
              '<span class="agent-tag" style="background:#0E3B2C;font-size:0.8rem;padding:4px 10px">EVIDENCE</span>'
              '<span class="agent-title" style="font-size:1.15rem">🧪 Is the framework better? — statistical evidence</span>'

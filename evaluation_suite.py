@@ -55,7 +55,7 @@ ACTIONS = list(ACTION_CODES.values())
 LABEL_SPEC: dict[str, dict] = {
     "feedback_type": {"agent": "Agent1", "values": FEEDBACK_TYPES, "help": "primary feedback type of the review"},
     "dimensions": {"agent": "Agent1", "values": None, "help": "EGSQUAL dimension keys of the issues, ';'-separated (empty cell = not labelled; NONE = no issue)"},
-    "sentiment": {"agent": "Agent2", "values": SENTIMENTS, "help": "overall sentiment of the text"},
+    "sentiment": {"agent": "Agent1", "values": SENTIMENTS, "help": "overall sentiment of the text (Agent 1, step 1)"},
     "severity": {"agent": "Agent2", "values": SEVERITIES, "help": "overall operational severity (None = no issue)"},
     "priority": {"agent": "Agent2", "values": PRIORITIES, "help": "overall priority (None = no issue)"},
     "action": {"agent": "Agent3", "values": ACTIONS, "help": "recommended operational action"},
@@ -475,6 +475,8 @@ def predictions_from_state(state: WorkflowState, system: str = "multi_agent") ->
     from evaluation import behavioural_checks
     p.consistency = {c.check: c.passed for c in behavioural_checks(state)
                      if c.check in CONSISTENCY_CHECKS}
+    if p.action in OPERATIONAL_ACTIONS:
+        p.consistency["action_supported_by_issues"] = len(a1.issues) > 0
     if state.errors:
         p.error = "; ".join(state.errors)
     return p
@@ -601,7 +603,9 @@ CONSISTENCY_CHECKS = {
     "severity_priority_follow_rules": "Severity and priority match rules R1–R4 and the Impact × Urgency matrix",
     "escalation_follows_evidence": "Escalation status is consistent with the complaint evidence (nothing invented)",
     "ticket_required_fields": "Generated tickets carry every required field",
+    "action_supported_by_issues": "An operational action (ticket, follow-up, escalation) is backed by at least one extracted issue",
 }
+OPERATIONAL_ACTIONS = {"TECH_TICKET", "FOLLOW_UP", "ESCALATION_CANDIDATE"}
 
 
 def _produced(preds, f: str) -> list:
@@ -610,7 +614,8 @@ def _produced(preds, f: str) -> list:
 
 
 def agent1_metrics(labels, preds) -> dict:
-    return {"feedback_type": multiclass(*_pairs(labels, preds, "feedback_type")),
+    return {"sentiment": multiclass(*_pairs(labels, preds, "sentiment")),
+            "feedback_type": multiclass(*_pairs(labels, preds, "feedback_type")),
             "dimensions": multilabel(*_pairs(labels, preds, "dimensions")),
             "issue_count": multiclass(*_pairs(labels, _produced(preds, "issue_count"), "issue_count"))}
 
@@ -634,8 +639,28 @@ def collaboration_summary(preds) -> dict:
             "llm_fallback_reviews": sum(p.used_fallback for p in ma)}
 
 
+# Ordinal scales for Mean Absolute Error: distance in levels between predicted and reference values
+ORDINAL = {"severity": {"None": 0, "Low": 1, "Medium": 2, "High": 3, "Critical": 4},
+           "priority": {"None": 0, "P4": 1, "P3": 2, "P2": 3, "P1": 4}}
+
+
+def ordinal_mae(labels, preds, f: str) -> dict:
+    """MAE on the ordinal scale (0 = no issue ... 4 = Critical / P1). Reviews with no prediction (FAILED)
+    cannot be placed on the scale; they are excluded here and reported separately (they already count as
+    wrong in accuracy and F1)."""
+    scale = ORDINAL[f]
+    t, p = _pairs(labels, preds, f)
+    d = [abs(scale[a] - scale[b]) for a, b in zip(t, p) if a in scale and b in scale]
+    return {"n": len(d), "excluded_failed": sum(1 for b in p if b not in scale),
+            "mae": sum(d) / len(d) if d else None,
+            "within_one": sum(x <= 1 for x in d) / len(d) if d else None,
+            "max_error": max(d) if d else None}
+
+
 def agent2_metrics(labels, preds, reviews: dict[str, ReviewInput] | None = None) -> dict:
     out = {f: multiclass(*_pairs(labels, preds, f)) for f in ("sentiment", "severity", "priority")}
+    out["severity_mae"] = ordinal_mae(labels, preds, "severity")
+    out["priority_mae"] = ordinal_mae(labels, preds, "priority")
     # star rating as a supporting indicator for sentiment
     reviews = reviews or {}
     t, rp, sp = [], [], []
@@ -693,6 +718,9 @@ def overall_table(labels, results: dict[str, list[Prediction]], prices: dict[str
             "system_key": sys_key, "system": SYSTEMS.get(sys_key, sys_key), "reviews": len(preds),
             **{f"macro_f1_{k}": v for k, v in per.items()},
             "macro_f1_mean": sum(avail) / len(avail) if avail else None,
+            "accuracy_severity": a2["severity"]["accuracy"], "accuracy_priority": a2["priority"]["accuracy"],
+            "mae_severity": a2["severity_mae"]["mae"], "mae_priority": a2["priority_mae"]["mae"],
+            "routing_accuracy": a3["routing"]["accuracy"], "escalation_accuracy": a3["escalation"]["accuracy"],
             "escalation_f1": a3["escalation"]["f1"], "ticket_f1": a3["ticket"]["f1"],
             "json_validity_rate": a3["json_validity_rate"],
             "severe_recall": severe_recall(labels, preds)["recall"],
@@ -704,6 +732,56 @@ def overall_table(labels, results: dict[str, list[Prediction]], prices: dict[str
             "failed_reviews": sum(1 for p in preds if p.failed),
             "reviews_with_llm_fallback": sum(1 for p in preds if p.used_fallback),
         })
+    return pd.DataFrame(rows)
+
+
+# The evaluation plan of the research (Section 3.5): which metric is reported for which agent and task.
+EVAL_PLAN = [
+    ("Agent 1", "Feedback classification", "feedback_type", ["precision", "recall", "macro_f1"]),
+    ("Agent 1", "Sentiment identification", "sentiment", ["precision", "recall", "macro_f1"]),
+    ("Agent 1", "Service-quality dimension (EGSQUAL)", "dimensions", ["precision", "recall", "macro_f1"]),
+    ("Agent 2", "Severity level", "severity", ["accuracy", "macro_f1", "mae"]),
+    ("Agent 2", "Priority level (P1–P4)", "priority", ["accuracy", "macro_f1", "mae"]),
+    ("Agent 3", "Actionability identification", "ticket", ["accuracy", "f1"]),
+    ("Agent 3", "Responsible-team routing", "handling_team", ["accuracy", "macro_f1"]),
+    ("Agent 3", "Escalation recommendation", "escalation", ["accuracy", "f1"]),
+    ("Agent 3", "Action consistent with issues and rules", "consistency", ["rate"]),
+]
+METRIC_NAMES = {"precision": "Precision (macro)", "recall": "Recall (macro)", "macro_f1": "Macro F1", "accuracy": "Accuracy",
+                "mae": "MAE (levels)", "f1": "F1 (class 'yes')", "rate": "Consistency rate"}
+
+
+def plan_metric(labels, preds, field_name: str, metric: str):
+    """One value of the evaluation plan for one system; None when it cannot be computed (no labels / not produced)."""
+    if field_name == "consistency":
+        checks = [v for p in preds if p.consistency for k, v in p.consistency.items()
+                  if k in ("severity_priority_follow_rules", "escalation_follows_evidence", "action_supported_by_issues")
+                  and v is not None]
+        return (sum(checks) / len(checks)) if checks else None
+    if metric == "mae":
+        return ordinal_mae(labels, preds, field_name)["mae"]
+    t, p = _pairs(labels, _produced(preds, field_name) if field_name == "handling_team" else preds, field_name)
+    if not t:
+        return None
+    if field_name == "dimensions":
+        m = multilabel(t, p)
+        return m.get(f"macro_{metric}" if metric in ("precision", "recall") else metric)
+    if field_name in ("ticket", "escalation"):
+        return binary(t, p)[metric]
+    m = multiclass(t, p)
+    return m[f"macro_{metric}"] if metric in ("precision", "recall") else m[metric]
+
+
+def evaluation_plan_table(labels, results: dict[str, list[Prediction]]) -> pd.DataFrame:
+    """Section 3.5 summary: one row per (agent, task, metric), one column per system."""
+    rows = []
+    for agent, task, f, metrics in EVAL_PLAN:
+        for m in metrics:
+            row = {"Agent": agent, "Task": task, "Metric": METRIC_NAMES[m]}
+            for sk, preds in results.items():
+                v = plan_metric(labels, preds, f, m)
+                row[SYSTEMS.get(sk, sk)] = None if v is None else round(float(v), 3)
+            rows.append(row)
     return pd.DataFrame(rows)
 
 

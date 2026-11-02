@@ -222,11 +222,26 @@ def _results(run: E.EvalRun, labels: dict) -> None:
     if fb:
         st.warning(f"{fb} review(s) used the rule-based fallback for at least one LLM step.")
 
+    _plan_summary(run, labels)
     _agent1(preds, labels)
     _agent2(preds, labels)
     _agent3(preds, labels)
     _overall(run, labels)
     _proof(run, labels)
+
+
+def _plan_summary(run: E.EvalRun, labels: dict) -> None:
+    """Section 3.5 of the research: every planned metric for every system, in one table."""
+    tab = E.evaluation_plan_table(labels, run.results)
+    with st.container(border=True):
+        st.markdown("**Evaluation summary (research method, Section 3.5)** — Agent 1: Precision, Recall, Macro F1 · "
+                    "Agent 2: Accuracy, Macro F1, MAE · Agent 3: Accuracy, F1, consistency · compared across systems")
+        st.dataframe(tab, hide_index=True, width="stretch")
+        st.caption("Higher is better for every metric except MAE (lower is better). Empty cells mean the metric could not be "
+                   "computed: no reference labels for that field, or the system does not produce it (baselines do not route "
+                   "to teams or run rule-consistency checks). Nothing is estimated.")
+        st.download_button("⬇ Download table (CSV)", tab.to_csv(index=False).encode("utf-8-sig"),
+                           file_name="evaluation_summary_section_3_5.csv", mime="text/csv", key="evd_plan_csv")
 
 
 def _multiclass_block(title: str, m: dict, color: str, order: list[str] | None, key: str) -> None:
@@ -250,7 +265,9 @@ def _multiclass_block(title: str, m: dict, color: str, order: list[str] | None, 
 def _agent1(preds, labels) -> None:
     m = E.agent1_metrics(labels, preds)
     with st.container(key="frame_Agent1_evd"):
-        C.agent_section_header("Agent1", "Agent 1 evaluation: feedback classification, EGSQUAL dimensions, issue extraction")
+        C.agent_section_header("Agent1", "Agent 1 evaluation: sentiment, feedback classification, EGSQUAL dimensions, issue extraction "
+                                         "· Precision, Recall, Macro F1")
+        _multiclass_block("Sentiment identification", m["sentiment"], A_COLORS["Agent1"], E.SENTIMENTS, "evd_sent")
         _multiclass_block("Feedback classification", m["feedback_type"], A_COLORS["Agent1"], E.FEEDBACK_TYPES, "evd_ft")
         d = m["dimensions"]
         with st.container(border=True):
@@ -277,10 +294,9 @@ def _agent1(preds, labels) -> None:
 def _agent2(preds, labels) -> None:
     m = E.agent2_metrics(labels, preds, st.session_state.get("evd_reviews"))
     with st.container(key="frame_Agent2_evd"):
-        C.agent_section_header("Agent2", "Agent 2 evaluation: severity and priority accuracy, confusion matrices, consistency")
-        _multiclass_block("Sentiment", m["sentiment"], A_COLORS["Agent2"], E.SENTIMENTS, "evd_sent")
+        C.agent_section_header("Agent2", "Agent 2 evaluation: severity and priority · Accuracy, Macro F1, MAE")
         with st.container(border=True):
-            st.markdown("**Star rating as a supporting indicator for sentiment** (1–2★ negative · 3★ neutral · 4–5★ positive)")
+            st.markdown("**Star rating vs. Agent 1 sentiment** (1–2★ negative · 3★ neutral · 4–5★ positive) — context only")
             rb = m["rating_baseline"]
             C.kpi_row([("Agreement: predicted sentiment vs. rating", _f(m["rating_agreement"], ".1%"),
                         f"{m['rating_agreement_n']} review(s) with a rating", "navy"),
@@ -290,10 +306,17 @@ def _agent2(preds, labels) -> None:
             st.caption("The rating is never used as a label and never changes severity; it only helps interpret sentiment.")
         _multiclass_block("Severity", m["severity"], A_COLORS["Agent2"], E.SEVERITIES, "evd_sev")
         _multiclass_block("Priority", m["priority"], A_COLORS["Agent2"], E.PRIORITIES, "evd_pri")
-        if any(p.consistency for p in preds):
-            with st.container(border=True):
-                st.markdown("**Evidence and decision consistency** (label-free, on the evaluated reviews)")
-                st.dataframe(E.consistency_rates(preds), hide_index=True, width="stretch")
+        with st.container(border=True):
+            st.markdown("**Mean Absolute Error on the ordinal scale** (None 0 · Low/P4 1 · Medium/P3 2 · High/P2 3 · Critical/P1 4)")
+            sm, pm = m["severity_mae"], m["priority_mae"]
+            C.kpi_row([("Severity MAE", _f(sm["mae"], ".2f"), f"{sm['n']} review(s) · lower is better"),
+                       ("Severity within ±1 level", _f(sm["within_one"], ".1%"), f"max error {sm['max_error'] if sm['max_error'] is not None else 'n/a'}", "navy"),
+                       ("Priority MAE", _f(pm["mae"], ".2f"), f"{pm['n']} review(s) · lower is better"),
+                       ("Priority within ±1 level", _f(pm["within_one"], ".1%"), f"max error {pm['max_error'] if pm['max_error'] is not None else 'n/a'}", "navy")])
+            ex = sm["excluded_failed"] + pm["excluded_failed"]
+            st.caption("MAE measures how far a wrong level is from the reference: predicting P2 for a P1 case (error 1) is "
+                       "less serious than predicting P4 (error 3)." + (f" {ex} failed prediction(s) have no level and are "
+                       "excluded from MAE (they already count as wrong in accuracy and F1)." if ex else ""))
 
 
 def _binary_kpis(title: str, b: dict) -> None:
@@ -311,7 +334,7 @@ def _binary_kpis(title: str, b: dict) -> None:
 def _agent3(preds, labels) -> None:
     m = E.agent3_metrics(labels, preds)
     with st.container(key="frame_Agent3_evd"):
-        C.agent_section_header("Agent3", "Agent 3 evaluation: actionability, routing and escalation decisions, JSON validity")
+        C.agent_section_header("Agent3", "Agent 3 evaluation: actionability, routing, escalation · Accuracy, F1, rule consistency")
         a, b = st.columns(2)
         with a:
             _binary_kpis("Actionability (ticket generated: yes/no)", m["ticket"])
@@ -330,6 +353,10 @@ def _agent3(preds, labels) -> None:
         else:
             st.caption("Routing accuracy: add a `handling_team` column to the labels (team names as in knowledge_base/handling_teams.json).")
         _multiclass_block("Recommended action (additional)", m["action"], A_COLORS["Agent3"], E.ACTIONS, "evd_act")
+        if any(p.consistency for p in preds):
+            with st.container(border=True):
+                st.markdown("**Consistency of decisions with the identified issues and the predefined rules** (label-free)")
+                st.dataframe(E.consistency_rates(preds), hide_index=True, width="stretch")
 
 
 def _overall(run: E.EvalRun, labels: dict) -> None:

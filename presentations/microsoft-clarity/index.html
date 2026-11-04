@@ -1,0 +1,1074 @@
+<title>Microsoft Clarity Deck</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one full-screen slide at a time, thermal-camera palette (cool blue → hot red) as the signature, quiet slate surfaces around it */
+:root {
+  --bg: #F2F4F8;
+  --surface: #FFFFFF;
+  --surface-2: #E8EBF2;
+  --ink: #131826;
+  --muted: #586074;
+  --line: #D6DAE4;
+  --hot: #E0482B;
+  --warm: #F2A33A;
+  --cool: #2B59C3;
+  --ok: #1E8A5A;
+  --bad: #C8322B;
+  --mock-bg: #FBFCFE;
+  --mock-ink: #283044;
+  --mock-block: #DCE1EC;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1119; --surface: #171B26; --surface-2: #212736;
+    --ink: #E8EBF2; --muted: #9AA2B6; --line: #2B3244;
+    --hot: #FF6A47; --warm: #F5B451; --cool: #7096F2; --ok: #3DBE84; --bad: #FF6B63;
+    --mock-bg: #1C2130; --mock-ink: #D3D8E4; --mock-block: #2E3547;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1119; --surface: #171B26; --surface-2: #212736;
+  --ink: #E8EBF2; --muted: #9AA2B6; --line: #2B3244;
+  --hot: #FF6A47; --warm: #F5B451; --cool: #7096F2; --ok: #3DBE84; --bad: #FF6B63;
+  --mock-bg: #1C2130; --mock-ink: #D3D8E4; --mock-block: #2E3547;
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.55;
+  overflow: hidden;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--cool); outline-offset: 2px; }
+
+.deck { position: relative; height: 100%; display: flex; flex-direction: column; }
+.slides { position: relative; flex: 1; min-height: 0; }
+.slide {
+  position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden;
+  padding-block: clamp(20px, 4vh, 48px) 24px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: none;
+}
+.slide.active { display: block; animation: enter .35s ease-out; }
+@keyframes enter { from { transform: translateY(8px); opacity: .6; } to { transform: none; opacity: 1; } }
+.inner { max-width: 1120px; margin: 0 auto; display: grid; gap: 24px; }
+
+.eyebrow {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--hot); font-weight: 600;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h2 { font-size: clamp(28px, 4.2vw, 48px); font-weight: 800; letter-spacing: -.02em; }
+h3 { font-size: 19px; font-weight: 700; line-height: 1.25; }
+p { margin: 0; max-width: 65ch; }
+.lead { font-size: clamp(16px, 1.6vw, 19px); color: var(--muted); }
+.head { display: grid; gap: 10px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.mono { font-family: var(--font-mono); }
+
+.split { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.split > * { min-width: 0; }
+@media (max-width: 860px) { .split { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 8px; }
+.seg button {
+  border: 0; background: transparent; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: 600; color: var(--muted);
+}
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface);
+  padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 14px;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* ---------- Bottom bar ---------- */
+.bar {
+  display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); background: var(--surface);
+  padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.bar .title { font-family: var(--font-display); font-weight: 700; font-size: 15px; white-space: nowrap; }
+.dots { display: flex; gap: 6px; flex: 1; justify-content: center; flex-wrap: wrap; }
+.dots button { width: 22px; height: 6px; border-radius: 3px; border: 0; background: var(--line); padding: 0; }
+.dots button.on { background: var(--hot); }
+.dots button:hover { background: var(--muted); }
+.counter { font-family: var(--font-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
+.navbtn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; }
+.navbtn:disabled { opacity: .35; cursor: default; }
+@media (max-width: 640px) { .bar .title { display: none; } .dots button { width: 12px; } }
+
+/* ---------- 1. Intro ---------- */
+.hero { position: relative; border-radius: 14px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); min-height: 360px; display: grid; }
+.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero .copy { position: relative; padding: clamp(24px, 5vw, 56px); display: grid; gap: 18px; align-content: end; pointer-events: none; }
+.hero h1 { font-size: clamp(44px, 8vw, 104px); font-weight: 800; letter-spacing: -.035em; line-height: .92; }
+.hero .hint { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.facts > div { border-top: 2px solid var(--ink); padding-top: 10px; display: grid; gap: 2px; }
+.facts b { font-family: var(--font-display); font-size: 22px; }
+@media (max-width: 760px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- 2. Overview ---------- */
+.features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .features { grid-template-columns: minmax(0, 1fr); } }
+.feature { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+.feature .tag { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.feature .more { display: none; color: var(--muted); font-size: 14px; }
+.feature[aria-expanded="true"] { border-color: var(--hot); }
+.feature[aria-expanded="true"] .more { display: block; }
+.feature .plus { font-family: var(--font-mono); color: var(--hot); font-size: 13px; }
+
+/* ---------- 3. Pipeline ---------- */
+.pipe { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; position: relative; }
+.pipe::before { content: ""; position: absolute; left: 10%; right: 10%; top: 22px; height: 2px; background: var(--line); }
+.step { position: relative; border: 0; background: none; display: grid; justify-items: center; gap: 10px; padding: 0 6px; text-align: center; }
+.step .node { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--line); font-family: var(--font-mono); font-weight: 600; transition: .2s; }
+.step[aria-selected="true"] .node { background: var(--hot); border-color: var(--hot); color: #fff; transform: scale(1.08); }
+.step span { font-weight: 600; font-size: 14px; }
+@media (max-width: 640px) { .pipe { grid-template-columns: minmax(0, 1fr); gap: 8px; } .pipe::before { display: none; } .step { grid-template-columns: 46px 1fr; justify-items: start; text-align: left; align-items: center; } }
+.stepdetail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.stepdetail > * { min-width: 0; }
+@media (max-width: 760px) { .stepdetail { grid-template-columns: minmax(0, 1fr); } }
+pre.code { margin: 0; background: var(--surface-2); border-radius: 8px; padding: 14px; overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; color: var(--ink); }
+
+/* ---------- Mock site (shared by heatmap, replay, privacy) ---------- */
+.mock {
+  position: relative; container-type: inline-size; aspect-ratio: 4 / 3; width: 100%; max-width: 100%;
+  background: var(--mock-bg); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; color: var(--mock-ink);
+  user-select: none;
+}
+.mock > div { position: absolute; }
+.m-nav { left: 0; right: 0; top: 0; height: 9%; border-bottom: 1px solid var(--line); }
+.m-logo { left: 4%; top: 2.6%; font-family: var(--font-display); font-weight: 800; font-size: 3.2cqw; }
+.m-link { top: 3%; font-size: 2.4cqw; color: var(--muted); }
+.m-signin { left: 78%; top: 1.8%; width: 16%; height: 5.4%; border-radius: 1cqw; border: 1px solid var(--mock-ink); display: grid; place-items: center; font-size: 2.3cqw; font-weight: 600; }
+.m-h1 { left: 6%; top: 15%; width: 54%; font-family: var(--font-display); font-weight: 800; font-size: 5.2cqw; line-height: 1.05; }
+.m-p { left: 6%; top: 29.5%; width: 52%; font-size: 2.3cqw; color: var(--muted); }
+.m-cta { left: 6%; top: 36%; width: 23%; height: 8%; border-radius: 1cqw; background: var(--cool); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 2.4cqw; }
+.m-img { left: 64%; top: 14%; width: 30%; height: 32%; border-radius: 1.2cqw; background: linear-gradient(135deg, var(--mock-block), var(--surface-2)); display: grid; place-items: center; font-size: 2cqw; color: var(--muted); }
+.m-card { top: 52%; width: 28%; height: 22%; border-radius: 1.2cqw; border: 1px solid var(--line); background: var(--surface); padding: 2cqw; display: grid; align-content: end; gap: .5cqw; font-size: 2.3cqw; font-weight: 700; }
+.m-card i { font-style: normal; font-weight: 400; color: var(--muted); font-size: 1.9cqw; }
+.m-input { left: 6%; top: 80%; width: 50%; height: 8%; border-radius: 1cqw; border: 1px solid var(--line); background: var(--surface); padding: 0 2cqw; display: flex; align-items: center; font-size: 2.2cqw; color: var(--muted); }
+.m-submit { left: 58%; top: 80%; width: 18%; height: 8%; border-radius: 1cqw; background: var(--mock-ink); color: var(--mock-bg); display: grid; place-items: center; font-weight: 700; font-size: 2.3cqw; }
+.mock canvas.heat { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.scrollbands { position: absolute; inset: 0; pointer-events: none; display: grid; }
+.scrollbands div { display: flex; align-items: flex-start; justify-content: flex-end; padding: .6cqw 1.2cqw; font-family: var(--font-mono); font-size: 1.9cqw; font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .5); }
+
+/* ---------- 4. Heatmap ---------- */
+.legend { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+.legend .ramp { width: 140px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #2B59C3, #1FB5D1, #7BD34A, #F2D33A, #F2A33A, #E0482B); }
+.toprow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.ranked { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ranked li { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 14px; }
+.ranked .track { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.ranked .track div { height: 100%; background: var(--hot); border-radius: 3px; transition: width .3s; }
+.ranked b { font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-size: 13px; }
+
+/* ---------- 5. Replay ---------- */
+.cursor { position: absolute; width: 4.2cqw; height: 4.2cqw; pointer-events: none; transform: translate(-12%, -8%); z-index: 3; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .35)); }
+.ripple { position: absolute; width: 7cqw; height: 7cqw; margin: -3.5cqw 0 0 -3.5cqw; border-radius: 50%; border: .5cqw solid var(--cool); pointer-events: none; animation: rip .7s ease-out forwards; z-index: 2; }
+.ripple.rage { border-color: var(--hot); }
+@keyframes rip { from { transform: scale(.2); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
+.trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.player { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.player input[type=range] { flex: 1; min-width: 160px; accent-color: var(--hot); }
+.time { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.events { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.events button { width: 100%; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 6px; display: grid; grid-template-columns: 48px 1fr; gap: 8px; font-size: 14px; color: var(--muted); }
+.events button .t { font-family: var(--font-mono); font-size: 12px; padding-top: 2px; }
+.events button.past { color: var(--ink); }
+.events button.now { background: var(--surface-2); color: var(--ink); font-weight: 600; }
+.pill { display: inline-block; font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
+.pill.rage { background: color-mix(in srgb, var(--hot) 18%, transparent); color: var(--hot); }
+.pill.dead { background: color-mix(in srgb, var(--warm) 22%, transparent); color: color-mix(in srgb, var(--warm) 70%, var(--ink)); }
+.pill.err { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
+
+/* ---------- 6. Signals ---------- */
+.signals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 520px) { .signals { grid-template-columns: minmax(0, 1fr); } }
+.signal { padding: 12px 14px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); display: grid; gap: 4px; }
+.signal h3 { font-size: 16px; }
+.signal p { font-size: 14px; color: var(--muted); }
+.signal.lit { border-color: var(--hot); box-shadow: 0 0 0 3px color-mix(in srgb, var(--hot) 20%, transparent); }
+.lab { display: grid; gap: 14px; }
+.lab .stage { position: relative; height: 200px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; }
+.broken { padding: 14px 22px; border-radius: 8px; border: 0; background: var(--cool); color: #fff; font-weight: 700; font-size: 16px; }
+.lab .stage .ripple { width: 46px; height: 46px; margin: -23px 0 0 -23px; border-width: 3px; }
+.log { font-family: var(--font-mono); font-size: 12.5px; display: grid; gap: 4px; min-height: 96px; }
+.log div { display: flex; gap: 10px; }
+.log .k { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- 7. Dashboard ---------- */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 2px; }
+.kpi .v { font-family: var(--font-display); font-weight: 800; font-size: clamp(26px, 3vw, 34px); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.kpi .l { font-size: 13px; color: var(--muted); }
+.bars { display: grid; gap: 10px; }
+.barrow { display: grid; grid-template-columns: 150px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 14px; }
+.barrow .track { height: 14px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.barrow .fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+.barrow b { font-family: var(--font-mono); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .barrow { grid-template-columns: 110px minmax(0, 1fr) 48px; } }
+.sample { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--warm); border: 1px solid currentColor; border-radius: 4px; padding: 2px 6px; }
+
+/* ---------- 8. Setup ---------- */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; counter-reset: s; }
+.steps li { display: grid; grid-template-columns: 30px 1fr; gap: 12px; counter-increment: s; }
+.steps li::before { content: counter(s); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--bg); font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.steps b { display: block; }
+.steps span { color: var(--muted); font-size: 14px; }
+.codebox { display: grid; gap: 10px; }
+.codehead { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ---------- 9. Privacy ---------- */
+.form { display: grid; gap: 10px; }
+.field { display: grid; gap: 4px; }
+.field label { font-size: 12px; font-family: var(--font-mono); color: var(--muted); }
+.field .val { padding: 9px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--mock-bg); font-size: 15px; min-height: 40px; }
+.masked { color: transparent !important; background-image: repeating-linear-gradient(90deg, var(--mock-block) 0 7px, transparent 7px 9px); background-size: auto 10px; background-repeat: repeat-x; background-position: 12px center; }
+.textline.masked { background-position: 0 center; display: inline-block; }
+.page-text { display: grid; gap: 4px; }
+.page-text .h { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+.modecards { display: grid; gap: 8px; }
+.modecard { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 12px 14px; display: grid; gap: 2px; }
+.modecard[aria-pressed="true"] { border-color: var(--cool); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cool) 20%, transparent); }
+.modecard b { font-family: var(--font-display); font-size: 16px; }
+.modecard span { font-size: 14px; color: var(--muted); }
+
+/* ---------- 10. Compare ---------- */
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 14px; }
+th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+thead th { font-family: var(--font-display); font-size: 16px; }
+thead th button { border: 0; background: none; font: inherit; padding: 0; border-bottom: 2px dashed var(--line); }
+tbody th { font-weight: 600; color: var(--muted); width: 26%; }
+td.hl, th.hl { background: color-mix(in srgb, var(--hot) 9%, transparent); }
+.y { color: var(--ok); font-weight: 700; }
+.n { color: var(--muted); }
+
+/* ---------- 11. Quiz ---------- */
+.quiz { display: grid; gap: 16px; }
+.q { display: grid; gap: 10px; }
+.q h3 { font-size: 18px; }
+.opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 600px) { .opts { grid-template-columns: minmax(0, 1fr); } }
+.opt { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 10px 14px; font-size: 15px; }
+.opt:hover:not(:disabled) { border-color: var(--muted); }
+.opt.right { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
+.opt.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+.opt:disabled { cursor: default; }
+.why { font-size: 14px; color: var(--muted); }
+.score { font-family: var(--font-display); font-size: 22px; font-weight: 700; }
+
+/* ---------- 12. Summary ---------- */
+.takeaways { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .takeaways { grid-template-columns: minmax(0, 1fr); } }
+.takeaways div { border-top: 3px solid var(--hot); padding-top: 12px; display: grid; gap: 6px; }
+.takeaways div:nth-child(2) { border-color: var(--warm); }
+.takeaways div:nth-child(3) { border-color: var(--cool); }
+.qa { font-family: var(--font-display); font-size: clamp(40px, 7vw, 84px); font-weight: 800; letter-spacing: -.03em; }
+.links { display: flex; flex-wrap: wrap; gap: 10px; }
+.links a { color: var(--cool); font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slide.active { animation: none; }
+  .ripple { animation-duration: .01s; }
+  * { transition: none !important; }
+}
+</style>
+
+<div class="deck">
+  <main class="slides" id="slides">
+
+    <!-- 1 -->
+    <section class="slide" id="intro" data-title="Microsoft Clarity">
+      <div class="inner">
+        <div class="hero" id="hero">
+          <canvas id="heroCanvas" aria-hidden="true"></canvas>
+          <div class="copy">
+            <div class="eyebrow">Behavior analytics · Presentation</div>
+            <h1>Microsoft<br>Clarity</h1>
+            <p class="lead">See what users actually do on a website: where they click, how far they scroll, and where they get stuck.</p>
+            <div class="hint">Move your pointer over this panel. Every movement leaves heat, which is how a heatmap is built.</div>
+          </div>
+        </div>
+        <div class="facts">
+          <div><b>2020</b><span class="muted small">Public launch by Microsoft</span></div>
+          <div><b>Free</b><span class="muted small">No paid plans or upgrade tiers</span></div>
+          <div><b>1 tag</b><span class="muted small">A short JavaScript snippet to install</span></div>
+          <div><b>3 views</b><span class="muted small">Dashboard, heatmaps, recordings</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section class="slide" id="overview" data-title="What Clarity does">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">What it is</div>
+          <h2>Quantitative analytics tells you <em>what</em> happened. Clarity shows you <em>why</em>.</h2>
+          <p class="lead">Tools like Google Analytics count visits and conversions. Clarity records the behavior behind those numbers. Tap a card to open it.</p>
+        </div>
+        <div class="features" id="features">
+          <button class="feature" aria-expanded="false"><span class="tag">See</span><h3>Heatmaps</h3><span class="more">Click, scroll and area maps of every page, aggregated across all visitors. Hot spots show where attention goes.</span><span class="plus">+ details</span></button>
+          <button class="feature" aria-expanded="false"><span class="tag">Watch</span><h3>Session recordings</h3><span class="more">Replays of real visits rebuilt from page changes and pointer events. Not a video, so they are light and searchable.</span><span class="plus">+ details</span></button>
+          <button class="feature" aria-expanded="false"><span class="tag">Detect</span><h3>Frustration signals</h3><span class="more">Rage clicks, dead clicks, excessive scrolling and quick backs are flagged automatically, so you can jump to the sessions that went wrong.</span><span class="plus">+ details</span></button>
+          <button class="feature" aria-expanded="false"><span class="tag">Measure</span><h3>Dashboard</h3><span class="more">Sessions, pages per session, scroll depth, active time and the share of sessions with each frustration signal, filterable by device, country, browser and more.</span><span class="plus">+ details</span></button>
+          <button class="feature" aria-expanded="false"><span class="tag">Summarize</span><h3>Copilot in Clarity</h3><span class="more">AI summaries of recordings and heatmaps, plus questions you can ask about your data in plain language.</span><span class="plus">+ details</span></button>
+          <button class="feature" aria-expanded="false"><span class="tag">Connect</span><h3>Integrations</h3><span class="more">Links with Google Analytics, and has ready installs for platforms such as WordPress, Shopify and Google Tag Manager.</span><span class="plus">+ details</span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section class="slide" id="pipeline" data-title="How it works">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">How it works</div>
+          <h2>From one script tag to a replayable session</h2>
+          <p class="lead">Select each stage to see what happens.</p>
+        </div>
+        <div class="pipe" role="tablist" id="pipe"></div>
+        <div class="panel stepdetail" id="stepDetail"></div>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="slide" id="heatmaps" data-title="Heatmaps">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">Interactive · Heatmaps</div>
+          <h2>Where do people click on this page?</h2>
+          <p class="lead">A sample e-service page with 600 simulated visitors. Click anywhere on it to add your own clicks, then switch to the scroll map.</p>
+        </div>
+        <div class="split">
+          <div style="display:grid;gap:12px">
+            <div class="toprow">
+              <div class="seg" id="heatMode">
+                <button aria-pressed="true" data-mode="click">Click map</button>
+                <button aria-pressed="false" data-mode="scroll">Scroll map</button>
+                <button aria-pressed="false" data-mode="off">Page only</button>
+              </div>
+              <div class="legend"><span>few</span><span class="ramp"></span><span>many</span></div>
+            </div>
+            <div class="mock" id="heatMock"></div>
+          </div>
+          <div class="panel" style="display:grid;gap:14px">
+            <h3>Most clicked elements</h3>
+            <ol class="ranked" id="ranked"></ol>
+            <p class="small muted" id="heatNote">The hero image gets many clicks but is not a link. In Clarity those show up as <b>dead clicks</b>: a sign users expect it to do something.</p>
+            <button class="btn" id="heatReset">Clear my clicks</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="slide" id="recordings" data-title="Session recordings">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">Interactive · Session recordings</div>
+          <h2>Replay one visitor's 13 seconds</h2>
+          <p class="lead">Press play, drag the timeline, or jump to an event. Clarity tags the moments that matter so you don't watch every minute.</p>
+        </div>
+        <div class="split">
+          <div style="display:grid;gap:12px">
+            <div class="mock" id="replayMock"></div>
+            <div class="player">
+              <button class="btn primary" id="playBtn" aria-label="Play">▶ Play</button>
+              <input type="range" id="scrub" min="0" max="13000" step="10" value="0" aria-label="Timeline">
+              <span class="time" id="clock">0:00 / 0:13</span>
+              <div class="seg" id="speed"><button aria-pressed="true" data-s="1">1×</button><button aria-pressed="false" data-s="2">2×</button></div>
+            </div>
+          </div>
+          <div class="panel" style="display:grid;gap:10px">
+            <div class="small muted mono">Desktop · Chrome · Entry: /renew</div>
+            <ul class="events" id="events"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section class="slide" id="signals" data-title="Frustration signals">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">Interactive · Smart events</div>
+          <h2>Can you trigger a rage click?</h2>
+          <p class="lead">The button below is broken on purpose. Click it once, then click it fast several times, and watch which signal fires.</p>
+        </div>
+        <div class="split">
+          <div class="panel lab">
+            <div class="stage" id="stage"><button class="broken" id="broken">Download my certificate</button></div>
+            <div class="log" id="log"><div><span class="k">--.--s</span><span class="muted">Waiting for clicks…</span></div></div>
+            <button class="btn" id="labReset" style="justify-self:start">Reset</button>
+          </div>
+          <div class="signals" id="signalCards">
+            <div class="signal" data-sig="dead"><h3>Dead click</h3><p>A click that causes no visible change on the page.</p></div>
+            <div class="signal" data-sig="rage"><h3>Rage click</h3><p>Several fast clicks on the same small area. A strong frustration sign.</p></div>
+            <div class="signal" data-sig="scroll"><h3>Excessive scrolling</h3><p>Scrolling up and down more than expected, as if searching for something.</p></div>
+            <div class="signal" data-sig="back"><h3>Quick back</h3><p>Leaving a page and returning right away, often after a wrong link.</p></div>
+            <div class="signal" data-sig="js"><h3>JavaScript errors</h3><p>Script errors captured in the session, linked to the moment they happened.</p></div>
+            <div class="signal" data-sig="err"><h3>Error click</h3><p>A click that is followed by a JavaScript error.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="slide" id="dashboard" data-title="Dashboard">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">Interactive · Dashboard</div>
+          <h2>The numbers that point you to the right recordings</h2>
+          <div class="toprow">
+            <div class="seg" id="device">
+              <button aria-pressed="true" data-d="all">All devices</button>
+              <button aria-pressed="false" data-d="desktop">Desktop</button>
+              <button aria-pressed="false" data-d="mobile">Mobile</button>
+              <button aria-pressed="false" data-d="tablet">Tablet</button>
+            </div>
+            <span class="sample">Sample data for illustration</span>
+          </div>
+        </div>
+        <div class="kpis" id="kpis"></div>
+        <div class="split">
+          <div class="panel" style="display:grid;gap:14px">
+            <h3>Sessions with each signal</h3>
+            <div class="bars" id="bars"></div>
+          </div>
+          <div class="panel" style="display:grid;gap:10px">
+            <h3>How to read it</h3>
+            <p class="muted" id="dashRead"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section class="slide" id="setup" data-title="Setup">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">Getting started</div>
+          <h2>Setup takes about five minutes</h2>
+        </div>
+        <div class="split">
+          <div class="codebox">
+            <div class="codehead">
+              <div class="seg" id="codeTabs">
+                <button aria-pressed="true" data-c="tag">Tracking tag</button>
+                <button aria-pressed="false" data-c="tags">Custom tags</button>
+                <button aria-pressed="false" data-c="event">Custom event</button>
+                <button aria-pressed="false" data-c="consent">Consent</button>
+              </div>
+              <button class="btn" id="copyBtn">Copy</button>
+            </div>
+            <pre class="code" id="code"></pre>
+            <p class="small muted" id="codeNote"></p>
+          </div>
+          <ol class="steps">
+            <li><div><b>Sign in at clarity.microsoft.com</b><span>Use a Microsoft, Google or Facebook account.</span></div></li>
+            <li><div><b>Create a project</b><span>Enter the site name and URL. Each project gets a unique ID.</span></div></li>
+            <li><div><b>Install the tag</b><span>Paste it in the page <span class="mono">&lt;head&gt;</span>, or use a platform plugin or Google Tag Manager.</span></div></li>
+            <li><div><b>Wait for data</b><span>Data usually appears within about two hours.</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9 -->
+    <section class="slide" id="privacy" data-title="Privacy and masking">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">Interactive · Privacy</div>
+          <h2>What does Clarity see on this form?</h2>
+          <p class="lead">Masking happens in the visitor's browser, before anything is sent. Pick a masking mode to see what reaches the recording.</p>
+        </div>
+        <div class="split">
+          <div class="panel form" id="privForm">
+            <div class="page-text"><span class="h textline" data-kind="text">Driving licence renewal</span><span class="small muted textline" data-kind="text">Fee: 40 SAR per year of validity</span></div>
+            <div class="field"><label>Full name</label><div class="val" data-kind="input">Sara Al-Qahtani</div></div>
+            <div class="field"><label>National ID</label><div class="val" data-kind="input">1098 765 432</div></div>
+            <div class="field"><label>Email</label><div class="val" data-kind="input">sara@example.com</div></div>
+            <div class="field"><label>Password</label><div class="val" data-kind="password">••••••••••</div></div>
+            <div class="field"><label>Comments</label><div class="val" data-kind="input">Please send the card to my new address.</div></div>
+          </div>
+          <div style="display:grid;gap:14px">
+            <div class="modecards" id="modes">
+              <button class="modecard" aria-pressed="false" data-m="strict"><b>Strict</b><span>All text on the page is masked.</span></button>
+              <button class="modecard" aria-pressed="true" data-m="balanced"><b>Balanced (default)</b><span>Sensitive content such as input fields is masked. Page text stays visible.</span></button>
+              <button class="modecard" aria-pressed="false" data-m="relaxed"><b>Relaxed</b><span>Most content is visible. Use only when the site holds no personal data.</span></button>
+            </div>
+            <pre class="code">&lt;!-- Override per element --&gt;
+&lt;div data-clarity-mask="true"&gt;…&lt;/div&gt;
+&lt;div data-clarity-unmask="true"&gt;…&lt;/div&gt;</pre>
+            <p class="small muted">Password fields are never captured. Clarity is GDPR and CCPA compliant, and the site owner is responsible for cookie consent where the law requires it.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 -->
+    <section class="slide" id="compare" data-title="Comparison">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">Positioning</div>
+          <h2>Clarity next to the tools it is usually compared with</h2>
+          <p class="lead">Select a tool's name to highlight its column. Most teams use Clarity together with GA4, not instead of it.</p>
+        </div>
+        <div class="tablewrap">
+          <table id="cmp">
+            <thead><tr><th></th><th data-col="1"><button>Microsoft Clarity</button></th><th data-col="2"><button>Hotjar</button></th><th data-col="3"><button>Google Analytics 4</button></th></tr></thead>
+            <tbody>
+              <tr><th>Price</th><td data-col="1">Free</td><td data-col="2">Free plan, paid plans for more sessions and features</td><td data-col="3">Free; GA4 360 is paid</td></tr>
+              <tr><th>Heatmaps</th><td data-col="1" class="y">Yes</td><td data-col="2" class="y">Yes</td><td data-col="3" class="n">No</td></tr>
+              <tr><th>Session recordings</th><td data-col="1" class="y">Yes</td><td data-col="2" class="y">Yes</td><td data-col="3" class="n">No</td></tr>
+              <tr><th>Rage and dead click detection</th><td data-col="1" class="y">Built in</td><td data-col="2" class="y">Yes</td><td data-col="3" class="n">No</td></tr>
+              <tr><th>Surveys and feedback widgets</th><td data-col="1" class="n">No</td><td data-col="2" class="y">Yes</td><td data-col="3" class="n">No</td></tr>
+              <tr><th>Traffic, acquisition and conversion reports</th><td data-col="1">Basic</td><td data-col="2">Basic</td><td data-col="3" class="y">In depth</td></tr>
+              <tr><th>Best for</th><td data-col="1">Seeing why users struggle, at no cost</td><td data-col="2">Behavior plus asking users directly</td><td data-col="3">Measuring traffic and conversions</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11 -->
+    <section class="slide" id="quiz" data-title="Quick quiz">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">Check your understanding</div>
+          <h2>Four quick questions</h2>
+          <div class="toprow"><span class="score" id="score">0 / 4</span><button class="btn" id="quizReset">Start over</button></div>
+        </div>
+        <div class="quiz" id="quizBox"></div>
+      </div>
+    </section>
+
+    <!-- 12 -->
+    <section class="slide" id="summary" data-title="Summary">
+      <div class="inner">
+        <div class="head">
+          <div class="eyebrow">Summary</div>
+          <h2>Why Clarity matters for digital services</h2>
+          <p class="lead">Written feedback tells you what a beneficiary felt. Clarity shows the steps that led there. Used together, they show both the complaint and its cause.</p>
+        </div>
+        <div class="takeaways">
+          <div><h3>Free and quick to add</h3><p class="muted">One tag, no paid tiers, data within hours.</p></div>
+          <div><h3>Finds friction automatically</h3><p class="muted">Rage clicks, dead clicks and errors lead straight to the sessions worth watching.</p></div>
+          <div><h3>Private by design</h3><p class="muted">Masking runs in the browser, with strict, balanced and relaxed modes.</p></div>
+        </div>
+        <div class="qa">Questions?</div>
+        <div class="links small">
+          <a href="https://clarity.microsoft.com" target="_blank" rel="noopener">clarity.microsoft.com</a>
+          <a href="https://learn.microsoft.com/clarity/" target="_blank" rel="noopener">Clarity documentation</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="bar" aria-label="Slides">
+    <span class="title" id="barTitle">Microsoft Clarity</span>
+    <button class="navbtn" id="prev" aria-label="Previous slide">←</button>
+    <div class="dots" id="dots"></div>
+    <button class="navbtn" id="next" aria-label="Next slide">→</button>
+    <span class="counter" id="counter">1 / 12</span>
+  </nav>
+</div>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ================= Navigation ================= */
+  const slides = $$('.slide');
+  const dots = $('#dots');
+  let cur = 0;
+  slides.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.setAttribute('aria-label', `Go to slide ${i + 1}: ${s.dataset.title}`);
+    b.onclick = () => go(i);
+    dots.appendChild(b);
+  });
+  const hooks = {};
+  function go(i, fromHash) {
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    slides[cur].classList.remove('active');
+    hooks[slides[cur].id]?.leave?.();
+    cur = i;
+    const s = slides[cur];
+    s.classList.add('active'); s.scrollTop = 0;
+    $$('button', dots).forEach((d, k) => d.classList.toggle('on', k <= cur));
+    $('#counter').textContent = `${cur + 1} / ${slides.length}`;
+    $('#barTitle').textContent = s.dataset.title;
+    $('#prev').disabled = cur === 0; $('#next').disabled = cur === slides.length - 1;
+    if (!fromHash && location.hash !== '#' + s.id) history.replaceState(null, '', '#' + s.id);
+    requestAnimationFrame(() => hooks[s.id]?.enter?.());
+  }
+  $('#prev').onclick = () => go(cur - 1);
+  $('#next').onclick = () => go(cur + 1);
+  addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea')) return;
+    if (['ArrowRight', 'PageDown'].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+    if (e.key === 'Home') go(0);
+    if (e.key === 'End') go(slides.length - 1);
+  });
+  // swipe on touch
+  let tx = null, ty = null;
+  $('#slides').addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+  $('#slides').addEventListener('touchend', e => {
+    if (tx == null) return;
+    const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5 && !e.target.closest('.mock, input, .hero')) go(cur + (dx < 0 ? 1 : -1));
+    tx = null;
+  });
+  const fromHash = () => { const i = slides.findIndex(s => '#' + s.id === location.hash); return i < 0 ? 0 : i; };
+  addEventListener('hashchange', () => go(fromHash(), true));
+
+  /* ================= Heat rendering ================= */
+  const ramp = (() => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 1;
+    const x = c.getContext('2d'); const g = x.createLinearGradient(0, 0, 256, 0);
+    [['#2B59C3', 0.15], ['#1FB5D1', 0.35], ['#7BD34A', 0.55], ['#F2D33A', 0.72], ['#F2A33A', 0.85], ['#E0482B', 1]].forEach(([c, o]) => g.addColorStop(o, c));
+    x.fillStyle = g; x.fillRect(0, 0, 256, 1);
+    return x.getImageData(0, 0, 256, 1).data;
+  })();
+  function colorize(ctx, w, h, maxAlpha = 210) {
+    const img = ctx.getImageData(0, 0, w, h), d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i + 3];
+      if (!a) continue;
+      const o = a * 4;
+      d[i] = ramp[o]; d[i + 1] = ramp[o + 1]; d[i + 2] = ramp[o + 2];
+      d[i + 3] = Math.min(maxAlpha, a * 1.6);
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  function blob(ctx, x, y, r, a) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+
+  /* ================= 1. Hero live heat ================= */
+  (() => {
+    const hero = $('#hero'), cv = $('#heroCanvas'), ctx = cv.getContext('2d');
+    const SCALE = 0.25;
+    const off = document.createElement('canvas'), octx = off.getContext('2d', { willReadFrequently: true });
+    let w = 0, h = 0, last = performance.now(), idleT = 0, running = false;
+    let pts = [];
+    function size() {
+      const r = hero.getBoundingClientRect(); if (!r.width) return;
+      w = Math.round(r.width * SCALE); h = Math.round(r.height * SCALE);
+      off.width = cv.width = w; off.height = cv.height = h;
+      seed();
+    }
+    function seed() {
+      // resting state: a few warm areas so the first frame is never empty
+      const spots = [[0.78, 0.3, 14], [0.62, 0.62, 10], [0.88, 0.7, 8], [0.7, 0.18, 6]];
+      spots.forEach(([fx, fy, n]) => { for (let i = 0; i < n; i++) blob(octx, (fx + (Math.random() - .5) * .08) * w, (fy + (Math.random() - .5) * .12) * h, 18, .32); });
+      draw();
+    }
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(off, 0, 0);
+      colorize(ctx, w, h, 170);
+    }
+    hero.addEventListener('pointermove', e => {
+      const r = hero.getBoundingClientRect();
+      pts.push([(e.clientX - r.left) * SCALE, (e.clientY - r.top) * SCALE]);
+      idleT = 0;
+    });
+    hero.addEventListener('pointerdown', e => {
+      const r = hero.getBoundingClientRect();
+      for (let i = 0; i < 6; i++) pts.push([(e.clientX - r.left) * SCALE, (e.clientY - r.top) * SCALE]);
+    });
+    let ang = 0;
+    function frame(now) {
+      if (!running) return;
+      const dt = now - last; last = now; idleT += dt;
+      if (idleT > 2500 && !reduced) { // drifting ghost cursor when idle
+        ang += dt * 0.0009;
+        pts.push([w * (0.72 + 0.16 * Math.cos(ang)), h * (0.45 + 0.28 * Math.sin(ang * 1.7))]);
+      }
+      octx.globalCompositeOperation = 'destination-out';
+      octx.fillStyle = 'rgba(0,0,0,0.012)'; octx.fillRect(0, 0, w, h);
+      octx.globalCompositeOperation = 'source-over';
+      pts.forEach(([x, y]) => blob(octx, x, y, 16, .12));
+      pts = [];
+      draw();
+      requestAnimationFrame(frame);
+    }
+    new ResizeObserver(size).observe(hero);
+    hooks.intro = {
+      enter() { if (!running) { running = true; last = performance.now(); requestAnimationFrame(frame); } },
+      leave() { running = false; }
+    };
+  })();
+
+  /* ================= 2. Feature cards ================= */
+  $$('#features .feature').forEach(f => f.onclick = () => {
+    const open = f.getAttribute('aria-expanded') === 'true';
+    f.setAttribute('aria-expanded', String(!open));
+    f.querySelector('.plus').textContent = open ? '+ details' : '− hide';
+  });
+
+  /* ================= 3. Pipeline ================= */
+  (() => {
+    const steps = [
+      { k: 'Install', title: 'Add the tag', body: 'The site owner pastes a small async script into every page. It loads the Clarity library from clarity.ms using the project ID.', code: '<script>\n  (function(c,l,a,r,i,t,y){ … })\n  (window, document, "clarity",\n   "script", "PROJECT_ID");\n<\/script>' },
+      { k: 'Capture', title: 'Record changes, not pixels', body: 'In the visitor\'s browser, the script serializes the page structure and then listens for changes: DOM mutations, pointer moves, clicks, scrolls, resizes and input focus.', code: 'click   x=212 y=318 target=button.cta\nscroll  y=640\nmutate  #results  +12 nodes\nmove    x=430 y=122' },
+      { k: 'Mask', title: 'Mask before sending', body: 'Masking rules are applied in the browser, so masked text never leaves the device. Input fields are masked by default.', code: '"Sara Al-Qahtani"  →  "•••• ••••••••"\ndata-clarity-mask="true"' },
+      { k: 'Upload', title: 'Send in small batches', body: 'Events are compressed and uploaded in small batches while the visitor browses, so the page stays fast.', code: 'POST  /collect   2.1 KB  (gzip)\nPOST  /collect   1.4 KB  (gzip)' },
+      { k: 'Analyze', title: 'Rebuild and aggregate', body: 'Clarity rebuilds each session for replay, adds it to page heatmaps, detects rage and dead clicks, and updates the dashboard metrics.', code: 'session  #8f2c  13s  rage_click=1\nheatmap  /renew  +1 session\ndashboard updated' }
+    ];
+    const pipe = $('#pipe'), det = $('#stepDetail');
+    steps.forEach((s, i) => {
+      const b = document.createElement('button');
+      b.className = 'step'; b.setAttribute('role', 'tab');
+      b.innerHTML = `<span class="node">${i + 1}</span><span>${s.k}</span>`;
+      b.onclick = () => pick(i);
+      pipe.appendChild(b);
+    });
+    function pick(i) {
+      $$('.step', pipe).forEach((b, k) => b.setAttribute('aria-selected', String(k === i)));
+      const s = steps[i];
+      det.innerHTML = `<div style="display:grid;gap:8px"><div class="eyebrow">Stage ${i + 1} of 5</div><h3>${s.title}</h3><p class="muted">${s.body}</p></div><pre class="code"></pre>`;
+      det.querySelector('pre').textContent = s.code;
+    }
+    pick(0);
+  })();
+
+  /* ================= Mock page builder ================= */
+  function buildMock(el) {
+    el.innerHTML = `
+      <div class="m-nav"></div>
+      <div class="m-logo">e-Services</div>
+      <div class="m-link" style="left:50%">Services</div>
+      <div class="m-link" style="left:64%">Help</div>
+      <div class="m-signin">Sign in</div>
+      <div class="m-h1">Renew your driving licence online</div>
+      <div class="m-p">Most renewals take under 10 minutes.</div>
+      <div class="m-cta">Start renewal</div>
+      <div class="m-img">illustration</div>
+      <div class="m-card" style="left:6%">Fees<i>What you pay</i></div>
+      <div class="m-card" style="left:36%">Documents<i>What to prepare</i></div>
+      <div class="m-card" style="left:66%">Track request<i>Check status</i></div>
+      <div class="m-input">Licence number</div>
+      <div class="m-submit">Check</div>`;
+  }
+
+  /* ================= 4. Heatmap ================= */
+  (() => {
+    const mock = $('#heatMock'); buildMock(mock);
+    const cv = document.createElement('canvas'); cv.className = 'heat'; mock.appendChild(cv);
+    const bands = document.createElement('div'); bands.className = 'scrollbands'; bands.hidden = true; mock.appendChild(bands);
+    const reach = [100, 96, 88, 74, 61, 49, 38, 30];
+    reach.forEach(p => {
+      const d = document.createElement('div');
+      const o = (p / 100) * 255 | 0;
+      d.style.background = `rgba(${ramp[o * 4]},${ramp[o * 4 + 1]},${ramp[o * 4 + 2]},.55)`;
+      d.textContent = p + '%';
+      bands.appendChild(d);
+    });
+    const zones = [
+      { name: 'Start renewal button', x: 17.5, y: 40, n: 210, sx: 4, sy: 1.6 },
+      { name: 'Hero illustration (not a link)', x: 79, y: 30, n: 120, sx: 6, sy: 6 },
+      { name: 'Track request card', x: 80, y: 63, n: 85, sx: 5, sy: 4 },
+      { name: 'Fees card', x: 20, y: 63, n: 70, sx: 5, sy: 4 },
+      { name: 'Sign in', x: 86, y: 4.5, n: 55, sx: 3, sy: 1 },
+      { name: 'Documents card', x: 50, y: 63, n: 35, sx: 5, sy: 4 },
+      { name: 'Licence number field', x: 30, y: 84, n: 25, sx: 10, sy: 1.5 }
+    ];
+    const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    const base = []; zones.forEach((z, zi) => { for (let i = 0; i < z.n; i++) base.push([z.x + gauss() * z.sx, z.y + gauss() * z.sy, zi]); });
+    let mine = [], mode = 'click';
+    function zoneOf(x, y) {
+      let best = -1, bd = 1e9;
+      zones.forEach((z, i) => { const d = Math.hypot((x - z.x) / (z.sx + 6), (y - z.y) / (z.sy + 4)); if (d < bd) { bd = d; best = i; } });
+      return bd < 1.6 ? best : -1;
+    }
+    function render() {
+      const r = mock.getBoundingClientRect(); if (!r.width) return;
+      const w = cv.width = Math.round(r.width), h = cv.height = Math.round(r.height);
+      const ctx = cv.getContext('2d', { willReadFrequently: true });
+      ctx.clearRect(0, 0, w, h);
+      cv.hidden = mode !== 'click'; bands.hidden = mode !== 'scroll';
+      if (mode === 'click') {
+        const rad = w * 0.035;
+        base.forEach(([x, y]) => blob(ctx, x / 100 * w, y / 100 * h, rad, .09));
+        mine.forEach(([x, y]) => blob(ctx, x / 100 * w, y / 100 * h, rad, .35));
+        colorize(ctx, w, h);
+      }
+      const counts = zones.map((z, i) => ({ name: z.name, n: z.n + mine.filter(m => m[2] === i).length }));
+      counts.sort((a, b) => b.n - a.n);
+      const max = counts[0].n;
+      $('#ranked').innerHTML = counts.slice(0, 5).map(c => `<li><span>${c.name}</span><b>${c.n}</b><div class="track"><div style="width:${(c.n / max * 100).toFixed(1)}%"></div></div></li>`).join('');
+      $('#heatNote').innerHTML = mode === 'scroll'
+        ? 'Only <b>49%</b> of visitors scroll far enough to see the cards, and <b>30%</b> reach the licence check form. Important actions placed low on the page are missed.'
+        : 'The hero illustration gets many clicks but is not a link. In Clarity those show up as <b>dead clicks</b>: a sign users expect it to do something.';
+    }
+    mock.addEventListener('click', e => {
+      if (mode !== 'click') return;
+      const r = mock.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width * 100, y = (e.clientY - r.top) / r.height * 100;
+      mine.push([x, y, zoneOf(x, y)]);
+      render();
+    });
+    $$('#heatMode button').forEach(b => b.onclick = () => {
+      mode = b.dataset.mode;
+      $$('#heatMode button').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+      render();
+    });
+    $('#heatReset').onclick = () => { mine = []; render(); };
+    new ResizeObserver(render).observe(mock);
+    hooks.heatmaps = { enter: render };
+  })();
+
+  /* ================= 5. Replay ================= */
+  (() => {
+    const mock = $('#replayMock'); buildMock(mock);
+    const trail = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    trail.setAttribute('class', 'trail'); trail.setAttribute('viewBox', '0 0 100 75'); trail.setAttribute('preserveAspectRatio', 'none');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    path.setAttribute('fill', 'none'); path.setAttribute('stroke', css('--hot')); path.setAttribute('stroke-width', '.35');
+    path.setAttribute('stroke-dasharray', '1 .8'); path.setAttribute('opacity', '.7');
+    trail.appendChild(path); mock.appendChild(trail);
+    const cur = document.createElement('div'); cur.className = 'cursor';
+    cur.innerHTML = '<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M4 2 L4 19 L8.5 15 L11.5 22 L14.5 20.7 L11.6 14 L18 14 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+    mock.appendChild(cur);
+
+    const K = [ // keyframes: t ms, x %, y %, click?, label, pill
+      { t: 0, x: 48, y: 62, label: 'Lands on /renew' },
+      { t: 1500, x: 30, y: 20, label: 'Reads the headline' },
+      { t: 2900, x: 79, y: 30, c: 1, label: 'Clicks the illustration', pill: 'dead' },
+      { t: 3250, x: 79.5, y: 30.5, c: 2 },
+      { t: 3500, x: 78.6, y: 29.6, c: 2 },
+      { t: 3750, x: 79.2, y: 30.4, c: 2, label: '4 fast clicks on the same spot', pill: 'rage' },
+      { t: 5400, x: 50, y: 62, label: 'Hovers “Documents”' },
+      { t: 6600, x: 51, y: 63, c: 1, label: 'Opens Documents' },
+      { t: 8400, x: 17, y: 40, c: 1, label: 'Clicks “Start renewal”' },
+      { t: 10100, x: 28, y: 84, c: 1, label: 'Types licence number' },
+      { t: 11800, x: 67, y: 84, c: 1, label: 'Clicks “Check”, script fails', pill: 'err' },
+      { t: 13000, x: 70, y: 70, label: 'Leaves the page' }
+    ];
+    const END = 13000;
+    const labeled = K.filter(k => k.label);
+    const pillTxt = { dead: 'dead click', rage: 'rage click', err: 'JS error' };
+    const list = $('#events');
+    const fmt = ms => `0:${String(Math.floor(ms / 1000)).padStart(2, '0')}`;
+    list.innerHTML = labeled.map((k, i) => `<li><button data-i="${i}"><span class="t">${fmt(k.t)}</span><span>${k.label}${k.pill ? `<span class="pill ${k.pill}">${pillTxt[k.pill]}</span>` : ''}</span></button></li>`).join('');
+    $$('button', list).forEach(b => b.onclick = () => { pause(); seek(labeled[+b.dataset.i].t); });
+
+    let t = 0, playing = false, speed = 1, last = 0;
+    const ease = p => p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    function posAt(time) {
+      let i = 0; while (i < K.length - 1 && K[i + 1].t <= time) i++;
+      const a = K[i], b = K[Math.min(i + 1, K.length - 1)];
+      if (a === b) return [a.x, a.y];
+      const p = ease(Math.min(1, (time - a.t) / (b.t - a.t)));
+      return [a.x + (b.x - a.x) * p, a.y + (b.y - a.y) * p];
+    }
+    function ripple(k) {
+      const r = document.createElement('div'); r.className = 'ripple' + (k.c === 2 || k.pill === 'rage' ? ' rage' : '');
+      r.style.left = k.x + '%'; r.style.top = k.y + '%';
+      mock.appendChild(r); setTimeout(() => r.remove(), 800);
+    }
+    function paint(prev) {
+      const [x, y] = posAt(t);
+      cur.style.left = x + '%'; cur.style.top = y + '%';
+      const ptsArr = []; for (let s = 0; s <= t; s += 120) { const [px, py] = posAt(s); ptsArr.push(`${px},${py * .75}`); }
+      ptsArr.push(`${x},${y * .75}`);
+      path.setAttribute('points', ptsArr.join(' '));
+      if (prev != null) K.forEach(k => { if (k.c && k.t > prev && k.t <= t) ripple(k); });
+      $('#scrub').value = t;
+      $('#clock').textContent = `${fmt(t)} / ${fmt(END)}`;
+      let nowI = -1; labeled.forEach((k, i) => { if (k.t <= t) nowI = i; });
+      $$('button', list).forEach((b, i) => { b.classList.toggle('past', i < nowI); b.classList.toggle('now', i === nowI); });
+    }
+    function seek(v) { t = Math.max(0, Math.min(END, v)); paint(); }
+    function loop(now) {
+      if (!playing) return;
+      const prev = t; t = Math.min(END, t + (now - last) * speed); last = now;
+      paint(prev);
+      if (t >= END) { pause(); return; }
+      requestAnimationFrame(loop);
+    }
+    function play() { if (t >= END) t = 0; playing = true; last = performance.now(); $('#playBtn').textContent = '❚❚ Pause'; $('#playBtn').setAttribute('aria-label', 'Pause'); requestAnimationFrame(loop); }
+    function pause() { playing = false; $('#playBtn').textContent = '▶ Play'; $('#playBtn').setAttribute('aria-label', 'Play'); }
+    $('#playBtn').onclick = () => playing ? pause() : play();
+    $('#scrub').oninput = e => { pause(); seek(+e.target.value); };
+    $$('#speed button').forEach(b => b.onclick = () => { speed = +b.dataset.s; $$('#speed button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); });
+    seek(4200); // resting frame shows the trail up to the rage click
+    hooks.recordings = { leave: pause };
+  })();
+
+  /* ================= 6. Rage click lab ================= */
+  (() => {
+    const stage = $('#stage'), log = $('#log');
+    let clicks = [], t0 = null, deadTimer = null, rageFired = false;
+    const cards = sig => $(`.signal[data-sig="${sig}"]`);
+    function line(txt, cls = '') {
+      if (t0 == null) { t0 = performance.now(); log.innerHTML = ''; }
+      const d = document.createElement('div');
+      d.innerHTML = `<span class="k">${((performance.now() - t0) / 1000).toFixed(2)}s</span><span class="${cls}">${txt}</span>`;
+      log.appendChild(d);
+      while (log.children.length > 6) log.firstChild.remove();
+    }
+    function flash(sig) { const c = cards(sig); c.classList.add('lit'); }
+    $('#broken').onclick = e => {
+      const r = stage.getBoundingClientRect();
+      const rp = document.createElement('div'); rp.className = 'ripple';
+      rp.style.left = (e.clientX - r.left || r.width / 2) + 'px'; rp.style.top = (e.clientY - r.top || r.height / 2) + 'px';
+      stage.appendChild(rp); setTimeout(() => rp.remove(), 800);
+      const now = performance.now();
+      clicks.push(now); clicks = clicks.filter(c => now - c < 1000);
+      line(`click on button "Download my certificate"`);
+      clearTimeout(deadTimer);
+      if (clicks.length >= 3 && !rageFired) {
+        rageFired = true;
+        line(`<b>rage_click</b> · ${clicks.length} clicks in under 1s`, 'pill rage');
+        flash('rage');
+      } else if (!rageFired) {
+        deadTimer = setTimeout(() => { line('<b>dead_click</b> · no page change after click', 'pill dead'); flash('dead'); }, 900);
+      }
+    };
+    $('#labReset').onclick = () => {
+      clicks = []; t0 = null; rageFired = false; clearTimeout(deadTimer);
+      log.innerHTML = '<div><span class="k">--.--s</span><span class="muted">Waiting for clicks…</span></div>';
+      $$('.signal').forEach(s => s.classList.remove('lit'));
+    };
+  })();
+
+  /* ================= 7. Dashboard ================= */
+  (() => {
+    const D = {
+      all:     { sessions: 48210, pps: 2.6, scroll: 54, time: '1m 12s', dead: 11.4, rage: 2.3, scrollx: 4.1, back: 7.8, js: 3.2, read: 'Across all devices, about 1 in 9 sessions has a dead click. Filter the recordings by “dead click” and watch the first ten: most land on the hero illustration.' },
+      desktop: { sessions: 17940, pps: 3.1, scroll: 61, time: '1m 38s', dead: 9.2, rage: 1.4, scrollx: 2.6, back: 5.9, js: 3.0, read: 'Desktop visitors browse more pages and scroll further. Frustration is lowest here, which is common because most pages are designed on a desktop first.' },
+      mobile:  { sessions: 27630, pps: 2.2, scroll: 49, time: '0m 58s', dead: 12.9, rage: 3.0, scrollx: 5.3, back: 9.1, js: 3.4, read: 'Mobile has the most rage clicks and excessive scrolling. Small tap targets and a long form are the usual causes. Start by watching mobile sessions with rage clicks.' },
+      tablet:  { sessions: 2640,  pps: 2.8, scroll: 57, time: '1m 21s', dead: 10.6, rage: 1.9, scrollx: 3.4, back: 7.0, js: 2.9, read: 'Tablet is a small share of traffic. Its numbers sit between desktop and mobile, so it is rarely the first place to look.' }
+    };
+    const colors = { dead: '--warm', rage: '--hot', scrollx: '--cool', back: '--cool', js: '--bad' };
+    const names = { dead: 'Dead clicks', rage: 'Rage clicks', scrollx: 'Excessive scrolling', back: 'Quick backs', js: 'JavaScript errors' };
+    function show(k) {
+      const d = D[k];
+      $('#kpis').innerHTML = [
+        [d.sessions.toLocaleString('en-US'), 'Sessions'], [d.pps.toFixed(1), 'Pages per session'], [d.scroll + '%', 'Average scroll depth'], [d.time, 'Average active time']
+      ].map(([v, l]) => `<div class="kpi"><span class="v">${v}</span><span class="l">${l}</span></div>`).join('');
+      $('#bars').innerHTML = Object.keys(names).map(s => `<div class="barrow"><span>${names[s]}</span><div class="track"><div class="fill" style="width:${(d[s] / 15 * 100).toFixed(1)}%;background:var(${colors[s]})"></div></div><b>${d[s].toFixed(1)}%</b></div>`).join('');
+      $('#dashRead').textContent = d.read;
+    }
+    $$('#device button').forEach(b => b.onclick = () => { $$('#device button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); show(b.dataset.d); });
+    show('all');
+  })();
+
+  /* ================= 8. Setup code ================= */
+  (() => {
+    const C = {
+      tag: { code: `<script type="text/javascript">
+  (function(c,l,a,r,i,t,y){
+    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+  })(window, document, "clarity", "script", "YOUR_PROJECT_ID");
+<\/script>`, note: 'Paste inside <head> on every page. Replace YOUR_PROJECT_ID with the ID from Settings → Setup.' },
+      tags: { code: `// Label sessions so you can filter them later
+clarity("set", "service", "licence-renewal");
+clarity("set", "user_type", "returning");`, note: 'Custom tags appear as filters on the dashboard, recordings and heatmaps.' },
+      event: { code: `// Mark an important moment in the session
+clarity("event", "renewal_submitted");
+
+// Keep this session even if sampling would drop it
+clarity("upgrade", "payment_failed");`, note: 'Custom events can be used as filters and to build funnels from key steps.' },
+      consent: { code: `// After the visitor accepts cookies
+clarity("consent");`, note: 'Where cookie consent is required, you can run Clarity without cookies until the visitor agrees, then call the consent API.' }
+    };
+    let key = 'tag';
+    function show(k) { key = k; $('#code').textContent = C[k].code; $('#codeNote').textContent = C[k].note; $$('#codeTabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === k))); }
+    $$('#codeTabs button').forEach(b => b.onclick = () => show(b.dataset.c));
+    $('#copyBtn').onclick = () => {
+      const done = () => { $('#copyBtn').textContent = 'Copied'; setTimeout(() => $('#copyBtn').textContent = 'Copy', 1400); };
+      const fallback = () => { const r = document.createRange(); r.selectNodeContents($('#code')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $('#copyBtn').textContent = 'Press Ctrl+C'; };
+      try { navigator.clipboard.writeText(C[key].code).then(done, fallback); } catch { fallback(); }
+    };
+    show('tag');
+  })();
+
+  /* ================= 9. Privacy ================= */
+  (() => {
+    function apply(m) {
+      $$('#modes .modecard').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === m)));
+      $$('#privForm [data-kind]').forEach(el => {
+        const k = el.dataset.kind;
+        const mask = k === 'password' || m === 'strict' || (m === 'balanced' && k === 'input');
+        el.classList.toggle('masked', mask);
+      });
+    }
+    $$('#modes .modecard').forEach(b => b.onclick = () => apply(b.dataset.m));
+    apply('balanced');
+  })();
+
+  /* ================= 10. Compare ================= */
+  (() => {
+    let on = '1';
+    function hl(c) { on = c; $$('#cmp [data-col]').forEach(x => x.classList.toggle('hl', x.dataset.col === c)); }
+    $$('#cmp thead th[data-col] button').forEach(b => b.onclick = () => hl(b.parentElement.dataset.col));
+    hl(on);
+  })();
+
+  /* ================= 11. Quiz ================= */
+  (() => {
+    const Q = [
+      { q: 'What does a rage click mean?', o: ['A click on an ad', 'Several fast clicks on the same spot', 'A click that opens a new tab', 'A double click on text'], a: 1, why: 'Rapid repeated clicks in one small area usually mean the user expected something to happen and it did not.' },
+      { q: 'Where is sensitive text masked?', o: ['On Clarity servers, after upload', 'In the visitor\'s browser, before upload', 'Only when viewing the recording', 'It is never masked'], a: 1, why: 'Masking runs in the browser, so masked content is never sent to Clarity.' },
+      { q: 'How is a session recording stored?', o: ['As an MP4 video', 'As screenshots every second', 'As page structure plus events, rebuilt for replay', 'As a GIF'], a: 2, why: 'Clarity captures DOM changes and pointer events, then rebuilds the page to replay it.' },
+      { q: 'Which question does Clarity answer better than GA4?', o: ['How many visitors came from search?', 'Why do users abandon the form?', 'What is the conversion rate by campaign?', 'Which country sends the most traffic?'], a: 1, why: 'GA4 measures how many. Clarity shows the behavior behind it, such as where users get stuck on a form.' }
+    ];
+    const box = $('#quizBox'); let score = 0;
+    function build() {
+      score = 0; $('#score').textContent = `0 / ${Q.length}`;
+      box.innerHTML = Q.map((q, i) => `<div class="q panel" data-i="${i}"><h3>${i + 1}. ${q.q}</h3><div class="opts">${q.o.map((o, j) => `<button class="opt" data-j="${j}">${o}</button>`).join('')}</div><p class="why" hidden></p></div>`).join('');
+      $$('.q', box).forEach(qe => {
+        const q = Q[+qe.dataset.i];
+        $$('.opt', qe).forEach(b => b.onclick = () => {
+          const j = +b.dataset.j;
+          $$('.opt', qe).forEach(x => { x.disabled = true; if (+x.dataset.j === q.a) x.classList.add('right'); });
+          if (j === q.a) score++; else b.classList.add('wrong');
+          const w = $('.why', qe); w.hidden = false; w.textContent = (j === q.a ? 'Correct. ' : 'Not quite. ') + q.why;
+          $('#score').textContent = `${score} / ${Q.length}`;
+        });
+      });
+    }
+    $('#quizReset').onclick = build;
+    build();
+  })();
+
+  go(fromHash(), true);
+})();
+</script>

@@ -314,45 +314,14 @@ td.hl, th.hl { background: color-mix(in srgb, var(--hot) 9%, transparent); }
           </div>
         </div>
         <div class="facts">
-          <div><b>2020</b><span class="muted small">Public launch by Microsoft</span></div>
-          <div><b>Free</b><span class="muted small">No paid plans or upgrade tiers</span></div>
-          <div><b>1 tag</b><span class="muted small">A short JavaScript snippet to install</span></div>
-          <div><b>3 views</b><span class="muted small">Dashboard, heatmaps, recordings</span></div>
-        </div>
-      </div>
+          <div><b>Heatmaps</b><span class="muted small">Where visitors click and how far they scroll, across all sessions</span></div>
+          <div><b>Recordings</b><span class="muted small">Replays of real visits, rebuilt from page changes and clicks</span></div>
+          <div><b>Frustration signals</b><span class="muted small">Rage clicks, dead clicks and errors flagged automatically</span></div>
+          <div><b>Free</b><span class="muted small">No paid tiers. One script tag to install</span></div>
+        </div>      </div>
     </section>
 
-    <!-- 2 -->
-    <section class="slide" id="overview" data-title="What Clarity does">
-      <div class="inner">
-        <div class="head">
-          <div class="eyebrow">What it is</div>
-          <h2>Quantitative analytics tells you <em>what</em> happened. Clarity shows you <em>why</em>.</h2>
-          <p class="lead">Tools like Google Analytics count visits and conversions. Clarity records the behavior behind those numbers. Tap a card to open it.</p>
-        </div>
-        <div class="features" id="features">
-          <button class="feature" aria-expanded="false"><span class="tag">See</span><h3>Heatmaps</h3><span class="more">Click, scroll and area maps of every page, aggregated across all visitors. Hot spots show where attention goes.</span><span class="plus">+ details</span></button>
-          <button class="feature" aria-expanded="false"><span class="tag">Watch</span><h3>Session recordings</h3><span class="more">Replays of real visits rebuilt from page changes and pointer events. Not a video, so they are light and searchable.</span><span class="plus">+ details</span></button>
-          <button class="feature" aria-expanded="false"><span class="tag">Detect</span><h3>Frustration signals</h3><span class="more">Rage clicks, dead clicks, excessive scrolling and quick backs are flagged automatically, so you can jump to the sessions that went wrong.</span><span class="plus">+ details</span></button>
-          <button class="feature" aria-expanded="false"><span class="tag">Measure</span><h3>Dashboard</h3><span class="more">Sessions, pages per session, scroll depth, active time and the share of sessions with each frustration signal, filterable by device, country, browser and more.</span><span class="plus">+ details</span></button>
-          <button class="feature" aria-expanded="false"><span class="tag">Summarize</span><h3>Copilot in Clarity</h3><span class="more">AI summaries of recordings and heatmaps, plus questions you can ask about your data in plain language.</span><span class="plus">+ details</span></button>
-          <button class="feature" aria-expanded="false"><span class="tag">Connect</span><h3>Integrations</h3><span class="more">Links with Google Analytics, and has ready installs for platforms such as WordPress, Shopify and Google Tag Manager.</span><span class="plus">+ details</span></button>
-        </div>
-      </div>
-    </section>
 
-    <!-- 3 -->
-    <section class="slide" id="pipeline" data-title="How it works">
-      <div class="inner">
-        <div class="head">
-          <div class="eyebrow">How it works</div>
-          <h2>From one script tag to a replayable session</h2>
-          <p class="lead">Select each stage to see what happens.</p>
-        </div>
-        <div class="pipe" role="tablist" id="pipe"></div>
-        <div class="panel stepdetail" id="stepDetail"></div>
-      </div>
-    </section>
 
     <!-- 4 -->
     <section class="slide" id="heatmaps" data-title="Heatmaps">
@@ -384,198 +353,23 @@ td.hl, th.hl { background: color-mix(in srgb, var(--hot) 9%, transparent); }
       </div>
     </section>
 
-    <!-- 5 -->
-    <section class="slide" id="recordings" data-title="Session recordings">
-      <div class="inner">
-        <div class="head">
-          <div class="eyebrow">Interactive · Session recordings</div>
-          <h2>Replay one visitor's 13 seconds</h2>
-          <p class="lead">Press play, drag the timeline, or jump to an event. Clarity tags the moments that matter so you don't watch every minute.</p>
-        </div>
-        <div class="split">
-          <div style="display:grid;gap:12px">
-            <div class="mock" id="replayMock"></div>
-            <div class="player">
-              <button class="btn primary" id="playBtn" aria-label="Play">▶ Play</button>
-              <input type="range" id="scrub" min="0" max="13000" step="10" value="0" aria-label="Timeline">
-              <span class="time" id="clock">0:00 / 0:13</span>
-              <div class="seg" id="speed"><button aria-pressed="true" data-s="1">1×</button><button aria-pressed="false" data-s="2">2×</button></div>
-            </div>
-          </div>
-          <div class="panel" style="display:grid;gap:10px">
-            <div class="small muted mono">Desktop · Chrome · Entry: /renew</div>
-            <ul class="events" id="events"></ul>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- 6 -->
-    <section class="slide" id="signals" data-title="Frustration signals">
-      <div class="inner">
-        <div class="head">
-          <div class="eyebrow">Interactive · Smart events</div>
-          <h2>Can you trigger a rage click?</h2>
-          <p class="lead">The button below is broken on purpose. Click it once, then click it fast several times, and watch which signal fires.</p>
-        </div>
-        <div class="split">
-          <div class="panel lab">
-            <div class="stage" id="stage"><button class="broken" id="broken">Download my certificate</button></div>
-            <div class="log" id="log"><div><span class="k">--.--s</span><span class="muted">Waiting for clicks…</span></div></div>
-            <button class="btn" id="labReset" style="justify-self:start">Reset</button>
-          </div>
-          <div class="signals" id="signalCards">
-            <div class="signal" data-sig="dead"><h3>Dead click</h3><p>A click that causes no visible change on the page.</p></div>
-            <div class="signal" data-sig="rage"><h3>Rage click</h3><p>Several fast clicks on the same small area. A strong frustration sign.</p></div>
-            <div class="signal" data-sig="scroll"><h3>Excessive scrolling</h3><p>Scrolling up and down more than expected, as if searching for something.</p></div>
-            <div class="signal" data-sig="back"><h3>Quick back</h3><p>Leaving a page and returning right away, often after a wrong link.</p></div>
-            <div class="signal" data-sig="js"><h3>JavaScript errors</h3><p>Script errors captured in the session, linked to the moment they happened.</p></div>
-            <div class="signal" data-sig="err"><h3>Error click</h3><p>A click that is followed by a JavaScript error.</p></div>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- 7 -->
-    <section class="slide" id="dashboard" data-title="Dashboard">
-      <div class="inner">
-        <div class="head">
-          <div class="eyebrow">Interactive · Dashboard</div>
-          <h2>The numbers that point you to the right recordings</h2>
-          <div class="toprow">
-            <div class="seg" id="device">
-              <button aria-pressed="true" data-d="all">All devices</button>
-              <button aria-pressed="false" data-d="desktop">Desktop</button>
-              <button aria-pressed="false" data-d="mobile">Mobile</button>
-              <button aria-pressed="false" data-d="tablet">Tablet</button>
-            </div>
-            <span class="sample">Sample data for illustration</span>
-          </div>
-        </div>
-        <div class="kpis" id="kpis"></div>
-        <div class="split">
-          <div class="panel" style="display:grid;gap:14px">
-            <h3>Sessions with each signal</h3>
-            <div class="bars" id="bars"></div>
-          </div>
-          <div class="panel" style="display:grid;gap:10px">
-            <h3>How to read it</h3>
-            <p class="muted" id="dashRead"></p>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- 8 -->
-    <section class="slide" id="setup" data-title="Setup">
-      <div class="inner">
-        <div class="head">
-          <div class="eyebrow">Getting started</div>
-          <h2>Setup takes about five minutes</h2>
-        </div>
-        <div class="split">
-          <div class="codebox">
-            <div class="codehead">
-              <div class="seg" id="codeTabs">
-                <button aria-pressed="true" data-c="tag">Tracking tag</button>
-                <button aria-pressed="false" data-c="tags">Custom tags</button>
-                <button aria-pressed="false" data-c="event">Custom event</button>
-                <button aria-pressed="false" data-c="consent">Consent</button>
-              </div>
-              <button class="btn" id="copyBtn">Copy</button>
-            </div>
-            <pre class="code" id="code"></pre>
-            <p class="small muted" id="codeNote"></p>
-          </div>
-          <ol class="steps">
-            <li><div><b>Sign in at clarity.microsoft.com</b><span>Use a Microsoft, Google or Facebook account.</span></div></li>
-            <li><div><b>Create a project</b><span>Enter the site name and URL. Each project gets a unique ID.</span></div></li>
-            <li><div><b>Install the tag</b><span>Paste it in the page <span class="mono">&lt;head&gt;</span>, or use a platform plugin or Google Tag Manager.</span></div></li>
-            <li><div><b>Wait for data</b><span>Data usually appears within about two hours.</span></div></li>
-          </ol>
-        </div>
-      </div>
-    </section>
 
-    <!-- 9 -->
-    <section class="slide" id="privacy" data-title="Privacy and masking">
-      <div class="inner">
-        <div class="head">
-          <div class="eyebrow">Interactive · Privacy</div>
-          <h2>What does Clarity see on this form?</h2>
-          <p class="lead">Masking happens in the visitor's browser, before anything is sent. Pick a masking mode to see what reaches the recording.</p>
-        </div>
-        <div class="split">
-          <div class="panel form" id="privForm">
-            <div class="page-text"><span class="h textline" data-kind="text">Driving licence renewal</span><span class="small muted textline" data-kind="text">Fee: 40 SAR per year of validity</span></div>
-            <div class="field"><label>Full name</label><div class="val" data-kind="input">Sara Al-Qahtani</div></div>
-            <div class="field"><label>National ID</label><div class="val" data-kind="input">1098 765 432</div></div>
-            <div class="field"><label>Email</label><div class="val" data-kind="input">sara@example.com</div></div>
-            <div class="field"><label>Password</label><div class="val" data-kind="password">••••••••••</div></div>
-            <div class="field"><label>Comments</label><div class="val" data-kind="input">Please send the card to my new address.</div></div>
-          </div>
-          <div style="display:grid;gap:14px">
-            <div class="modecards" id="modes">
-              <button class="modecard" aria-pressed="false" data-m="strict"><b>Strict</b><span>All text on the page is masked.</span></button>
-              <button class="modecard" aria-pressed="true" data-m="balanced"><b>Balanced (default)</b><span>Sensitive content such as input fields is masked. Page text stays visible.</span></button>
-              <button class="modecard" aria-pressed="false" data-m="relaxed"><b>Relaxed</b><span>Most content is visible. Use only when the site holds no personal data.</span></button>
-            </div>
-            <pre class="code">&lt;!-- Override per element --&gt;
-&lt;div data-clarity-mask="true"&gt;…&lt;/div&gt;
-&lt;div data-clarity-unmask="true"&gt;…&lt;/div&gt;</pre>
-            <p class="small muted">Password fields are never captured. Clarity is GDPR and CCPA compliant, and the site owner is responsible for cookie consent where the law requires it.</p>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- 10 -->
-    <section class="slide" id="compare" data-title="Comparison">
-      <div class="inner">
-        <div class="head">
-          <div class="eyebrow">Positioning</div>
-          <h2>Clarity next to the tools it is usually compared with</h2>
-          <p class="lead">Select a tool's name to highlight its column. Most teams use Clarity together with GA4, not instead of it.</p>
-        </div>
-        <div class="tablewrap">
-          <table id="cmp">
-            <thead><tr><th></th><th data-col="1"><button>Microsoft Clarity</button></th><th data-col="2"><button>Hotjar</button></th><th data-col="3"><button>Google Analytics 4</button></th></tr></thead>
-            <tbody>
-              <tr><th>Price</th><td data-col="1">Free</td><td data-col="2">Free plan, paid plans for more sessions and features</td><td data-col="3">Free; GA4 360 is paid</td></tr>
-              <tr><th>Heatmaps</th><td data-col="1" class="y">Yes</td><td data-col="2" class="y">Yes</td><td data-col="3" class="n">No</td></tr>
-              <tr><th>Session recordings</th><td data-col="1" class="y">Yes</td><td data-col="2" class="y">Yes</td><td data-col="3" class="n">No</td></tr>
-              <tr><th>Rage and dead click detection</th><td data-col="1" class="y">Built in</td><td data-col="2" class="y">Yes</td><td data-col="3" class="n">No</td></tr>
-              <tr><th>Surveys and feedback widgets</th><td data-col="1" class="n">No</td><td data-col="2" class="y">Yes</td><td data-col="3" class="n">No</td></tr>
-              <tr><th>Traffic, acquisition and conversion reports</th><td data-col="1">Basic</td><td data-col="2">Basic</td><td data-col="3" class="y">In depth</td></tr>
-              <tr><th>Best for</th><td data-col="1">Seeing why users struggle, at no cost</td><td data-col="2">Behavior plus asking users directly</td><td data-col="3">Measuring traffic and conversions</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
 
-    <!-- 11 -->
-    <section class="slide" id="quiz" data-title="Quick quiz">
-      <div class="inner">
-        <div class="head">
-          <div class="eyebrow">Check your understanding</div>
-          <h2>Four quick questions</h2>
-          <div class="toprow"><span class="score" id="score">0 / 4</span><button class="btn" id="quizReset">Start over</button></div>
-        </div>
-        <div class="quiz" id="quizBox"></div>
-      </div>
-    </section>
 
     <!-- 12 -->
     <section class="slide" id="summary" data-title="Summary">
       <div class="inner">
         <div class="head">
           <div class="eyebrow">Summary</div>
-          <h2>Why Clarity matters for digital services</h2>
+          <h2>Free, quick to add, and private by design</h2>
           <p class="lead">Written feedback tells you what a beneficiary felt. Clarity shows the steps that led there. Used together, they show both the complaint and its cause.</p>
         </div>
         <div class="takeaways">
-          <div><h3>Free and quick to add</h3><p class="muted">One tag, no paid tiers, data within hours.</p></div>
+          <div><h3>Set up in minutes</h3><p class="muted">Create a project at clarity.microsoft.com, paste the script in the page head, and data appears within about two hours.</p></div>
           <div><h3>Finds friction automatically</h3><p class="muted">Rage clicks, dead clicks and errors lead straight to the sessions worth watching.</p></div>
           <div><h3>Private by design</h3><p class="muted">Masking runs in the browser, with strict, balanced and relaxed modes.</p></div>
         </div>
@@ -594,7 +388,7 @@ td.hl, th.hl { background: color-mix(in srgb, var(--hot) 9%, transparent); }
     <button class="navbtn" id="prev" aria-label="Previous slide">←</button>
     <div class="dots" id="dots"></div>
     <button class="navbtn" id="next" aria-label="Next slide">→</button>
-    <span class="counter" id="counter">1 / 12</span>
+    <span class="counter" id="counter">1 / 3</span>
   </nav>
 </div>
 
@@ -732,39 +526,6 @@ td.hl, th.hl { background: color-mix(in srgb, var(--hot) 9%, transparent); }
     };
   })();
 
-  /* ================= 2. Feature cards ================= */
-  $$('#features .feature').forEach(f => f.onclick = () => {
-    const open = f.getAttribute('aria-expanded') === 'true';
-    f.setAttribute('aria-expanded', String(!open));
-    f.querySelector('.plus').textContent = open ? '+ details' : '− hide';
-  });
-
-  /* ================= 3. Pipeline ================= */
-  (() => {
-    const steps = [
-      { k: 'Install', title: 'Add the tag', body: 'The site owner pastes a small async script into every page. It loads the Clarity library from clarity.ms using the project ID.', code: '<script>\n  (function(c,l,a,r,i,t,y){ … })\n  (window, document, "clarity",\n   "script", "PROJECT_ID");\n<\/script>' },
-      { k: 'Capture', title: 'Record changes, not pixels', body: 'In the visitor\'s browser, the script serializes the page structure and then listens for changes: DOM mutations, pointer moves, clicks, scrolls, resizes and input focus.', code: 'click   x=212 y=318 target=button.cta\nscroll  y=640\nmutate  #results  +12 nodes\nmove    x=430 y=122' },
-      { k: 'Mask', title: 'Mask before sending', body: 'Masking rules are applied in the browser, so masked text never leaves the device. Input fields are masked by default.', code: '"Sara Al-Qahtani"  →  "•••• ••••••••"\ndata-clarity-mask="true"' },
-      { k: 'Upload', title: 'Send in small batches', body: 'Events are compressed and uploaded in small batches while the visitor browses, so the page stays fast.', code: 'POST  /collect   2.1 KB  (gzip)\nPOST  /collect   1.4 KB  (gzip)' },
-      { k: 'Analyze', title: 'Rebuild and aggregate', body: 'Clarity rebuilds each session for replay, adds it to page heatmaps, detects rage and dead clicks, and updates the dashboard metrics.', code: 'session  #8f2c  13s  rage_click=1\nheatmap  /renew  +1 session\ndashboard updated' }
-    ];
-    const pipe = $('#pipe'), det = $('#stepDetail');
-    steps.forEach((s, i) => {
-      const b = document.createElement('button');
-      b.className = 'step'; b.setAttribute('role', 'tab');
-      b.innerHTML = `<span class="node">${i + 1}</span><span>${s.k}</span>`;
-      b.onclick = () => pick(i);
-      pipe.appendChild(b);
-    });
-    function pick(i) {
-      $$('.step', pipe).forEach((b, k) => b.setAttribute('aria-selected', String(k === i)));
-      const s = steps[i];
-      det.innerHTML = `<div style="display:grid;gap:8px"><div class="eyebrow">Stage ${i + 1} of 5</div><h3>${s.title}</h3><p class="muted">${s.body}</p></div><pre class="code"></pre>`;
-      det.querySelector('pre').textContent = s.code;
-    }
-    pick(0);
-  })();
-
   /* ================= Mock page builder ================= */
   function buildMock(el) {
     el.innerHTML = `
@@ -849,224 +610,6 @@ td.hl, th.hl { background: color-mix(in srgb, var(--hot) 9%, transparent); }
     $('#heatReset').onclick = () => { mine = []; render(); };
     new ResizeObserver(render).observe(mock);
     hooks.heatmaps = { enter: render };
-  })();
-
-  /* ================= 5. Replay ================= */
-  (() => {
-    const mock = $('#replayMock'); buildMock(mock);
-    const trail = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    trail.setAttribute('class', 'trail'); trail.setAttribute('viewBox', '0 0 100 75'); trail.setAttribute('preserveAspectRatio', 'none');
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    path.setAttribute('fill', 'none'); path.setAttribute('stroke', css('--hot')); path.setAttribute('stroke-width', '.35');
-    path.setAttribute('stroke-dasharray', '1 .8'); path.setAttribute('opacity', '.7');
-    trail.appendChild(path); mock.appendChild(trail);
-    const cur = document.createElement('div'); cur.className = 'cursor';
-    cur.innerHTML = '<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M4 2 L4 19 L8.5 15 L11.5 22 L14.5 20.7 L11.6 14 L18 14 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>';
-    mock.appendChild(cur);
-
-    const K = [ // keyframes: t ms, x %, y %, click?, label, pill
-      { t: 0, x: 48, y: 62, label: 'Lands on /renew' },
-      { t: 1500, x: 30, y: 20, label: 'Reads the headline' },
-      { t: 2900, x: 79, y: 30, c: 1, label: 'Clicks the illustration', pill: 'dead' },
-      { t: 3250, x: 79.5, y: 30.5, c: 2 },
-      { t: 3500, x: 78.6, y: 29.6, c: 2 },
-      { t: 3750, x: 79.2, y: 30.4, c: 2, label: '4 fast clicks on the same spot', pill: 'rage' },
-      { t: 5400, x: 50, y: 62, label: 'Hovers “Documents”' },
-      { t: 6600, x: 51, y: 63, c: 1, label: 'Opens Documents' },
-      { t: 8400, x: 17, y: 40, c: 1, label: 'Clicks “Start renewal”' },
-      { t: 10100, x: 28, y: 84, c: 1, label: 'Types licence number' },
-      { t: 11800, x: 67, y: 84, c: 1, label: 'Clicks “Check”, script fails', pill: 'err' },
-      { t: 13000, x: 70, y: 70, label: 'Leaves the page' }
-    ];
-    const END = 13000;
-    const labeled = K.filter(k => k.label);
-    const pillTxt = { dead: 'dead click', rage: 'rage click', err: 'JS error' };
-    const list = $('#events');
-    const fmt = ms => `0:${String(Math.floor(ms / 1000)).padStart(2, '0')}`;
-    list.innerHTML = labeled.map((k, i) => `<li><button data-i="${i}"><span class="t">${fmt(k.t)}</span><span>${k.label}${k.pill ? `<span class="pill ${k.pill}">${pillTxt[k.pill]}</span>` : ''}</span></button></li>`).join('');
-    $$('button', list).forEach(b => b.onclick = () => { pause(); seek(labeled[+b.dataset.i].t); });
-
-    let t = 0, playing = false, speed = 1, last = 0;
-    const ease = p => p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-    function posAt(time) {
-      let i = 0; while (i < K.length - 1 && K[i + 1].t <= time) i++;
-      const a = K[i], b = K[Math.min(i + 1, K.length - 1)];
-      if (a === b) return [a.x, a.y];
-      const p = ease(Math.min(1, (time - a.t) / (b.t - a.t)));
-      return [a.x + (b.x - a.x) * p, a.y + (b.y - a.y) * p];
-    }
-    function ripple(k) {
-      const r = document.createElement('div'); r.className = 'ripple' + (k.c === 2 || k.pill === 'rage' ? ' rage' : '');
-      r.style.left = k.x + '%'; r.style.top = k.y + '%';
-      mock.appendChild(r); setTimeout(() => r.remove(), 800);
-    }
-    function paint(prev) {
-      const [x, y] = posAt(t);
-      cur.style.left = x + '%'; cur.style.top = y + '%';
-      const ptsArr = []; for (let s = 0; s <= t; s += 120) { const [px, py] = posAt(s); ptsArr.push(`${px},${py * .75}`); }
-      ptsArr.push(`${x},${y * .75}`);
-      path.setAttribute('points', ptsArr.join(' '));
-      if (prev != null) K.forEach(k => { if (k.c && k.t > prev && k.t <= t) ripple(k); });
-      $('#scrub').value = t;
-      $('#clock').textContent = `${fmt(t)} / ${fmt(END)}`;
-      let nowI = -1; labeled.forEach((k, i) => { if (k.t <= t) nowI = i; });
-      $$('button', list).forEach((b, i) => { b.classList.toggle('past', i < nowI); b.classList.toggle('now', i === nowI); });
-    }
-    function seek(v) { t = Math.max(0, Math.min(END, v)); paint(); }
-    function loop(now) {
-      if (!playing) return;
-      const prev = t; t = Math.min(END, t + (now - last) * speed); last = now;
-      paint(prev);
-      if (t >= END) { pause(); return; }
-      requestAnimationFrame(loop);
-    }
-    function play() { if (t >= END) t = 0; playing = true; last = performance.now(); $('#playBtn').textContent = '❚❚ Pause'; $('#playBtn').setAttribute('aria-label', 'Pause'); requestAnimationFrame(loop); }
-    function pause() { playing = false; $('#playBtn').textContent = '▶ Play'; $('#playBtn').setAttribute('aria-label', 'Play'); }
-    $('#playBtn').onclick = () => playing ? pause() : play();
-    $('#scrub').oninput = e => { pause(); seek(+e.target.value); };
-    $$('#speed button').forEach(b => b.onclick = () => { speed = +b.dataset.s; $$('#speed button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); });
-    seek(4200); // resting frame shows the trail up to the rage click
-    hooks.recordings = { leave: pause };
-  })();
-
-  /* ================= 6. Rage click lab ================= */
-  (() => {
-    const stage = $('#stage'), log = $('#log');
-    let clicks = [], t0 = null, deadTimer = null, rageFired = false;
-    const cards = sig => $(`.signal[data-sig="${sig}"]`);
-    function line(txt, cls = '') {
-      if (t0 == null) { t0 = performance.now(); log.innerHTML = ''; }
-      const d = document.createElement('div');
-      d.innerHTML = `<span class="k">${((performance.now() - t0) / 1000).toFixed(2)}s</span><span class="${cls}">${txt}</span>`;
-      log.appendChild(d);
-      while (log.children.length > 6) log.firstChild.remove();
-    }
-    function flash(sig) { const c = cards(sig); c.classList.add('lit'); }
-    $('#broken').onclick = e => {
-      const r = stage.getBoundingClientRect();
-      const rp = document.createElement('div'); rp.className = 'ripple';
-      rp.style.left = (e.clientX - r.left || r.width / 2) + 'px'; rp.style.top = (e.clientY - r.top || r.height / 2) + 'px';
-      stage.appendChild(rp); setTimeout(() => rp.remove(), 800);
-      const now = performance.now();
-      clicks.push(now); clicks = clicks.filter(c => now - c < 1000);
-      line(`click on button "Download my certificate"`);
-      clearTimeout(deadTimer);
-      if (clicks.length >= 3 && !rageFired) {
-        rageFired = true;
-        line(`<b>rage_click</b> · ${clicks.length} clicks in under 1s`, 'pill rage');
-        flash('rage');
-      } else if (!rageFired) {
-        deadTimer = setTimeout(() => { line('<b>dead_click</b> · no page change after click', 'pill dead'); flash('dead'); }, 900);
-      }
-    };
-    $('#labReset').onclick = () => {
-      clicks = []; t0 = null; rageFired = false; clearTimeout(deadTimer);
-      log.innerHTML = '<div><span class="k">--.--s</span><span class="muted">Waiting for clicks…</span></div>';
-      $$('.signal').forEach(s => s.classList.remove('lit'));
-    };
-  })();
-
-  /* ================= 7. Dashboard ================= */
-  (() => {
-    const D = {
-      all:     { sessions: 48210, pps: 2.6, scroll: 54, time: '1m 12s', dead: 11.4, rage: 2.3, scrollx: 4.1, back: 7.8, js: 3.2, read: 'Across all devices, about 1 in 9 sessions has a dead click. Filter the recordings by “dead click” and watch the first ten: most land on the hero illustration.' },
-      desktop: { sessions: 17940, pps: 3.1, scroll: 61, time: '1m 38s', dead: 9.2, rage: 1.4, scrollx: 2.6, back: 5.9, js: 3.0, read: 'Desktop visitors browse more pages and scroll further. Frustration is lowest here, which is common because most pages are designed on a desktop first.' },
-      mobile:  { sessions: 27630, pps: 2.2, scroll: 49, time: '0m 58s', dead: 12.9, rage: 3.0, scrollx: 5.3, back: 9.1, js: 3.4, read: 'Mobile has the most rage clicks and excessive scrolling. Small tap targets and a long form are the usual causes. Start by watching mobile sessions with rage clicks.' },
-      tablet:  { sessions: 2640,  pps: 2.8, scroll: 57, time: '1m 21s', dead: 10.6, rage: 1.9, scrollx: 3.4, back: 7.0, js: 2.9, read: 'Tablet is a small share of traffic. Its numbers sit between desktop and mobile, so it is rarely the first place to look.' }
-    };
-    const colors = { dead: '--warm', rage: '--hot', scrollx: '--cool', back: '--cool', js: '--bad' };
-    const names = { dead: 'Dead clicks', rage: 'Rage clicks', scrollx: 'Excessive scrolling', back: 'Quick backs', js: 'JavaScript errors' };
-    function show(k) {
-      const d = D[k];
-      $('#kpis').innerHTML = [
-        [d.sessions.toLocaleString('en-US'), 'Sessions'], [d.pps.toFixed(1), 'Pages per session'], [d.scroll + '%', 'Average scroll depth'], [d.time, 'Average active time']
-      ].map(([v, l]) => `<div class="kpi"><span class="v">${v}</span><span class="l">${l}</span></div>`).join('');
-      $('#bars').innerHTML = Object.keys(names).map(s => `<div class="barrow"><span>${names[s]}</span><div class="track"><div class="fill" style="width:${(d[s] / 15 * 100).toFixed(1)}%;background:var(${colors[s]})"></div></div><b>${d[s].toFixed(1)}%</b></div>`).join('');
-      $('#dashRead').textContent = d.read;
-    }
-    $$('#device button').forEach(b => b.onclick = () => { $$('#device button').forEach(o => o.setAttribute('aria-pressed', String(o === b))); show(b.dataset.d); });
-    show('all');
-  })();
-
-  /* ================= 8. Setup code ================= */
-  (() => {
-    const C = {
-      tag: { code: `<script type="text/javascript">
-  (function(c,l,a,r,i,t,y){
-    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-  })(window, document, "clarity", "script", "YOUR_PROJECT_ID");
-<\/script>`, note: 'Paste inside <head> on every page. Replace YOUR_PROJECT_ID with the ID from Settings → Setup.' },
-      tags: { code: `// Label sessions so you can filter them later
-clarity("set", "service", "licence-renewal");
-clarity("set", "user_type", "returning");`, note: 'Custom tags appear as filters on the dashboard, recordings and heatmaps.' },
-      event: { code: `// Mark an important moment in the session
-clarity("event", "renewal_submitted");
-
-// Keep this session even if sampling would drop it
-clarity("upgrade", "payment_failed");`, note: 'Custom events can be used as filters and to build funnels from key steps.' },
-      consent: { code: `// After the visitor accepts cookies
-clarity("consent");`, note: 'Where cookie consent is required, you can run Clarity without cookies until the visitor agrees, then call the consent API.' }
-    };
-    let key = 'tag';
-    function show(k) { key = k; $('#code').textContent = C[k].code; $('#codeNote').textContent = C[k].note; $$('#codeTabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === k))); }
-    $$('#codeTabs button').forEach(b => b.onclick = () => show(b.dataset.c));
-    $('#copyBtn').onclick = () => {
-      const done = () => { $('#copyBtn').textContent = 'Copied'; setTimeout(() => $('#copyBtn').textContent = 'Copy', 1400); };
-      const fallback = () => { const r = document.createRange(); r.selectNodeContents($('#code')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $('#copyBtn').textContent = 'Press Ctrl+C'; };
-      try { navigator.clipboard.writeText(C[key].code).then(done, fallback); } catch { fallback(); }
-    };
-    show('tag');
-  })();
-
-  /* ================= 9. Privacy ================= */
-  (() => {
-    function apply(m) {
-      $$('#modes .modecard').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === m)));
-      $$('#privForm [data-kind]').forEach(el => {
-        const k = el.dataset.kind;
-        const mask = k === 'password' || m === 'strict' || (m === 'balanced' && k === 'input');
-        el.classList.toggle('masked', mask);
-      });
-    }
-    $$('#modes .modecard').forEach(b => b.onclick = () => apply(b.dataset.m));
-    apply('balanced');
-  })();
-
-  /* ================= 10. Compare ================= */
-  (() => {
-    let on = '1';
-    function hl(c) { on = c; $$('#cmp [data-col]').forEach(x => x.classList.toggle('hl', x.dataset.col === c)); }
-    $$('#cmp thead th[data-col] button').forEach(b => b.onclick = () => hl(b.parentElement.dataset.col));
-    hl(on);
-  })();
-
-  /* ================= 11. Quiz ================= */
-  (() => {
-    const Q = [
-      { q: 'What does a rage click mean?', o: ['A click on an ad', 'Several fast clicks on the same spot', 'A click that opens a new tab', 'A double click on text'], a: 1, why: 'Rapid repeated clicks in one small area usually mean the user expected something to happen and it did not.' },
-      { q: 'Where is sensitive text masked?', o: ['On Clarity servers, after upload', 'In the visitor\'s browser, before upload', 'Only when viewing the recording', 'It is never masked'], a: 1, why: 'Masking runs in the browser, so masked content is never sent to Clarity.' },
-      { q: 'How is a session recording stored?', o: ['As an MP4 video', 'As screenshots every second', 'As page structure plus events, rebuilt for replay', 'As a GIF'], a: 2, why: 'Clarity captures DOM changes and pointer events, then rebuilds the page to replay it.' },
-      { q: 'Which question does Clarity answer better than GA4?', o: ['How many visitors came from search?', 'Why do users abandon the form?', 'What is the conversion rate by campaign?', 'Which country sends the most traffic?'], a: 1, why: 'GA4 measures how many. Clarity shows the behavior behind it, such as where users get stuck on a form.' }
-    ];
-    const box = $('#quizBox'); let score = 0;
-    function build() {
-      score = 0; $('#score').textContent = `0 / ${Q.length}`;
-      box.innerHTML = Q.map((q, i) => `<div class="q panel" data-i="${i}"><h3>${i + 1}. ${q.q}</h3><div class="opts">${q.o.map((o, j) => `<button class="opt" data-j="${j}">${o}</button>`).join('')}</div><p class="why" hidden></p></div>`).join('');
-      $$('.q', box).forEach(qe => {
-        const q = Q[+qe.dataset.i];
-        $$('.opt', qe).forEach(b => b.onclick = () => {
-          const j = +b.dataset.j;
-          $$('.opt', qe).forEach(x => { x.disabled = true; if (+x.dataset.j === q.a) x.classList.add('right'); });
-          if (j === q.a) score++; else b.classList.add('wrong');
-          const w = $('.why', qe); w.hidden = false; w.textContent = (j === q.a ? 'Correct. ' : 'Not quite. ') + q.why;
-          $('#score').textContent = `${score} / ${Q.length}`;
-        });
-      });
-    }
-    $('#quizReset').onclick = build;
-    build();
   })();
 
   go(fromHash(), true);

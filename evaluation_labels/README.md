@@ -1,5 +1,19 @@
 # Reference labels
 
+## `specialist_labels_50_balanced.xlsx` (use this one)
+
+A stratified random sample of 50 reviews (seed 42) from the balanced research dataset `balanced_1-5_Arabic_dataset.csv`:
+25 one-star and 25 five-star reviews from 24 applications. The label cells are **empty**: specialists in digital service
+quality fill them in from the Arabic text only, ideally two annotators independently with disagreements resolved, and set
+`label_source` to `human-verified` for each completed row. Upload the file on the Evaluation & Results page.
+
+## Older files (not for the reported results)
+
+`draft_labels_ai_50.csv` and `review_labels_50.xlsx` were sampled from the earlier 6,513-review file (ratings 1-5). Only 16 of
+their 50 reviews occur in the balanced dataset, and their labels were drafted by an AI, so they are kept only as a
+worked example.
+
+
 `draft_labels_ai_50.csv` is a stratified sample of 50 reviews (by star rating, seed 42, from
 `evaluation_suite.annotation_sheet`). Its labels were **drafted by an AI (Claude)** from the Arabic text only,
 without looking at the system's outputs. It is **not** human-verified.

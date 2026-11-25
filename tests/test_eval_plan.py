@@ -26,10 +26,10 @@ def test_failed_predictions_are_excluded_from_mae_but_reported():
     assert m["n"] == 1 and m["excluded_failed"] == 1 and m["mae"] == 0
 
 
-def test_sentiment_is_scored_under_agent1():
-    assert E.LABEL_SPEC["sentiment"]["agent"] == "Agent1"
+def test_sentiment_is_scored_with_agent2_as_in_the_plan():
+    assert E.LABEL_SPEC["sentiment"]["agent"] == "Agent2"
     preds = [_p("r1", sentiment="Negative"), _p("r2", sentiment="Mixed"), _p("r3", sentiment="Positive", feedback_type="Praise")]
-    assert E.agent1_metrics(LABELS, preds)["sentiment"]["macro_f1"] == 1.0
+    assert E.agent2_metrics(LABELS, preds)["sentiment"]["macro_f1"] == 1.0
 
 
 def test_plan_table_has_every_planned_metric_and_no_invented_values():
@@ -37,14 +37,15 @@ def test_plan_table_has_every_planned_metric_and_no_invented_values():
              _p("r2", severity="Low", priority="P4", sentiment="Mixed", ticket="yes"),
              _p("r3", severity="None", priority="None", sentiment="Positive", feedback_type="Praise", ticket="no")]
     tab = E.evaluation_plan_table(LABELS, {"multi_agent": preds, "single_llm": preds})
-    assert set(tab["Agent"]) == {"Agent 1", "Agent 2", "Agent 3"}
-    assert {"Precision (macro)", "Recall (macro)", "Macro F1", "Accuracy", "MAE (levels)"} <= set(tab["Metric"])
+    assert set(tab["Agent"]) == {"Agent 1", "Agent 2", "Agent 3", "Overall"}
+    assert {"Precision", "Recall", "Macro F1", "F1", "Validity rate"} <= set(tab["Metric"])
     row = lambda task, metric: tab[(tab["Task"] == task) & (tab["Metric"] == metric)].iloc[0]  # noqa: E731
-    assert row("Severity level", "MAE (levels)")["Multi-Agent framework"] == round(1 / 3, 3)
-    assert row("Actionability identification", "Accuracy")["Single LLM"] == 1.0
-    # fields without reference labels stay empty, never 0
-    assert row("Responsible-team routing", "Accuracy").isna()["Multi-Agent framework"]
+    assert row("Sentiment", "Macro F1")["Multi-Agent framework"] == 1.0
+    assert row("Ticket generation", "F1")["Single LLM"] == 1.0
+    assert row("Mean Macro F1 (all fields)", "Value")["Multi-Agent framework"] is not None
+    # fields without reference labels, or no prices configured, stay empty, never 0
     assert row("Service-quality dimension (EGSQUAL)", "Macro F1").isna()["Multi-Agent framework"]
+    assert row("Estimated cost per review (USD)", "Value").isna()["Multi-Agent framework"]
 
 
 def test_operational_action_without_issue_fails_consistency():

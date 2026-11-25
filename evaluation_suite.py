@@ -55,7 +55,7 @@ ACTIONS = list(ACTION_CODES.values())
 LABEL_SPEC: dict[str, dict] = {
     "feedback_type": {"agent": "Agent1", "values": FEEDBACK_TYPES, "help": "primary feedback type of the review"},
     "dimensions": {"agent": "Agent1", "values": None, "help": "EGSQUAL dimension keys of the issues, ';'-separated (empty cell = not labelled; NONE = no issue)"},
-    "sentiment": {"agent": "Agent1", "values": SENTIMENTS, "help": "overall sentiment of the text (Agent 1, step 1)"},
+    "sentiment": {"agent": "Agent2", "values": SENTIMENTS, "help": "overall sentiment of the text (produced by Agent 1, evaluated with Agent 2 as in the evaluation plan)"},
     "severity": {"agent": "Agent2", "values": SEVERITIES, "help": "overall operational severity (None = no issue)"},
     "priority": {"agent": "Agent2", "values": PRIORITIES, "help": "overall priority (None = no issue)"},
     "action": {"agent": "Agent3", "values": ACTIONS, "help": "recommended operational action"},
@@ -614,8 +614,7 @@ def _produced(preds, f: str) -> list:
 
 
 def agent1_metrics(labels, preds) -> dict:
-    return {"sentiment": multiclass(*_pairs(labels, preds, "sentiment")),
-            "feedback_type": multiclass(*_pairs(labels, preds, "feedback_type")),
+    return {"feedback_type": multiclass(*_pairs(labels, preds, "feedback_type")),
             "dimensions": multilabel(*_pairs(labels, preds, "dimensions")),
             "issue_count": multiclass(*_pairs(labels, _produced(preds, "issue_count"), "issue_count"))}
 
@@ -735,24 +734,38 @@ def overall_table(labels, results: dict[str, list[Prediction]], prices: dict[str
     return pd.DataFrame(rows)
 
 
-# The evaluation plan of the research (Section 3.5): which metric is reported for which agent and task.
+# The evaluation plan of the research: which metric is reported for which agent and task.
 EVAL_PLAN = [
-    ("Agent 1", "Feedback classification", "feedback_type", ["precision", "recall", "macro_f1"]),
-    ("Agent 1", "Sentiment identification", "sentiment", ["precision", "recall", "macro_f1"]),
+    ("Agent 1", "Feedback type", "feedback_type", ["precision", "recall", "macro_f1"]),
     ("Agent 1", "Service-quality dimension (EGSQUAL)", "dimensions", ["precision", "recall", "macro_f1"]),
-    ("Agent 2", "Severity level", "severity", ["accuracy", "macro_f1", "mae"]),
-    ("Agent 2", "Priority level (P1–P4)", "priority", ["accuracy", "macro_f1", "mae"]),
-    ("Agent 3", "Actionability identification", "ticket", ["accuracy", "f1"]),
-    ("Agent 3", "Responsible-team routing", "handling_team", ["accuracy", "macro_f1"]),
-    ("Agent 3", "Escalation recommendation", "escalation", ["accuracy", "f1"]),
-    ("Agent 3", "Action consistent with issues and rules", "consistency", ["rate"]),
+    ("Agent 2", "Sentiment", "sentiment", ["precision", "recall", "macro_f1"]),
+    ("Agent 2", "Severity", "severity", ["precision", "recall", "macro_f1"]),
+    ("Agent 2", "Priority (P1–P4)", "priority", ["precision", "recall", "macro_f1"]),
+    ("Agent 3", "Ticket generation", "ticket", ["precision", "recall", "f1"]),
+    ("Agent 3", "Escalation decision", "escalation", ["precision", "recall", "f1"]),
+    ("Agent 3", "Ticket JSON validity", "json_validity", ["rate"]),
+    ("Overall", "Mean Macro F1 (all fields)", "overall_macro_f1", ["value"]),
+    ("Overall", "Escalation F1", "escalation", ["f1"]),
+    ("Overall", "Processing time per review (s)", "time_per_review", ["value"]),
+    ("Overall", "Estimated cost per review (USD)", "cost_per_review", ["value"]),
 ]
-METRIC_NAMES = {"precision": "Precision (macro)", "recall": "Recall (macro)", "macro_f1": "Macro F1", "accuracy": "Accuracy",
-                "mae": "MAE (levels)", "f1": "F1 (class 'yes')", "rate": "Consistency rate"}
+METRIC_NAMES = {"precision": "Precision", "recall": "Recall", "macro_f1": "Macro F1", "accuracy": "Accuracy",
+                "mae": "MAE (levels)", "f1": "F1", "rate": "Validity rate", "value": "Value"}
 
 
-def plan_metric(labels, preds, field_name: str, metric: str):
+def plan_metric(labels, preds, field_name: str, metric: str, prices: tuple | None = None):
     """One value of the evaluation plan for one system; None when it cannot be computed (no labels / not produced)."""
+    if field_name == "json_validity":
+        return agent3_metrics(labels, preds)["json_validity_rate"]
+    if field_name == "overall_macro_f1":
+        vals = [plan_metric(labels, preds, f, "macro_f1") for f in MACRO_FIELDS]
+        vals = [v for v in vals if v is not None]
+        return sum(vals) / len(vals) if vals else None
+    if field_name == "time_per_review":
+        return sum(p.seconds for p in preds) / len(preds) if preds else None
+    if field_name == "cost_per_review":
+        c = cost_usd(sum(p.input_tokens for p in preds), sum(p.output_tokens for p in preds), prices or (None, None))
+        return c / len(preds) if c is not None and preds else None
     if field_name == "consistency":
         checks = [v for p in preds if p.consistency for k, v in p.consistency.items()
                   if k in ("severity_priority_follow_rules", "escalation_follows_evidence", "action_supported_by_issues")
@@ -772,15 +785,15 @@ def plan_metric(labels, preds, field_name: str, metric: str):
     return m[f"macro_{metric}"] if metric in ("precision", "recall") else m[metric]
 
 
-def evaluation_plan_table(labels, results: dict[str, list[Prediction]]) -> pd.DataFrame:
-    """Section 3.5 summary: one row per (agent, task, metric), one column per system."""
+def evaluation_plan_table(labels, results: dict[str, list[Prediction]], prices: dict | None = None) -> pd.DataFrame:
+    """Evaluation-plan summary: one row per (agent, task, metric), one column per system."""
     rows = []
     for agent, task, f, metrics in EVAL_PLAN:
         for m in metrics:
             row = {"Agent": agent, "Task": task, "Metric": METRIC_NAMES[m]}
             for sk, preds in results.items():
-                v = plan_metric(labels, preds, f, m)
-                row[SYSTEMS.get(sk, sk)] = None if v is None else round(float(v), 3)
+                v = plan_metric(labels, preds, f, m, (prices or {}).get(sk))
+                row[SYSTEMS.get(sk, sk)] = None if v is None else round(float(v), 4 if f == "cost_per_review" else 3)
             rows.append(row)
     return pd.DataFrame(rows)
 
